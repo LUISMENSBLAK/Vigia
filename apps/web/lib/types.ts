@@ -20,7 +20,7 @@ export interface SystemStatus {
 export interface FireObservationProperties {
   id: string;
   source: string;
-  satellite: string;
+  platform: string;
   sensor: string;
   observed_at: string;
   received_at: string;

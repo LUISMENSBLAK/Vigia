@@ -39,7 +39,16 @@ async def verify() -> int:
     if settings.SUPABASE_DB_URL is None:
         print("SIN_DATOS: falta SUPABASE_DB_URL.")
         return 2
-    connection = await asyncpg.connect(settings.SUPABASE_DB_URL.get_secret_value())
+    try:
+        connection = await asyncpg.connect(
+            settings.SUPABASE_DB_URL.get_secret_value(), timeout=20, command_timeout=30
+        )
+    except asyncpg.InvalidPasswordError:
+        print("ERROR: SUPABASE_DB_URL — autenticación rechazada.")
+        return 1
+    except (OSError, TimeoutError):
+        print("ERROR: SUPABASE_DB_URL — red o DNS no disponible.")
+        return 1
     checks: list[Check] = []
     try:
         postgis = await connection.fetchval("select postgis_version()")

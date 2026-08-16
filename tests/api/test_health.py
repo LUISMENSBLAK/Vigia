@@ -22,14 +22,18 @@ async def test_health_is_explicit() -> None:
     assert response.headers["x-request-id"]
 
 
-async def test_status_does_not_claim_live_sources() -> None:
+async def test_status_does_not_claim_live_sources(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(main, "database", None)
     response = await request("/v1/status")
     assert response.status_code == 200
     assert {source["state"] for source in response.json()["sources"]} == {"SIN_DATOS"}
     assert all(source["last_received_at"] is None for source in response.json()["sources"])
 
 
-async def test_observations_are_empty_without_ingestion() -> None:
+async def test_observations_are_empty_without_ingestion(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(main, "database", None)
     payload = (await request("/v1/fire-observations")).json()
     assert payload["features"] == []
     assert payload["metadata"]["data_state"] == "SIN_DATOS"
@@ -52,7 +56,7 @@ class FakeDatabase:
             {
                 "id": "observation-id",
                 "source": "NASA FIRMS VIIRS NOAA-20",
-                "satellite": "N20",
+                "platform": "N20",
                 "sensor": "VIIRS",
                 "observed_at": datetime(2026, 8, 16, 10, 0, tzinfo=UTC),
                 "received_at": datetime(2026, 8, 16, 10, 20, tzinfo=UTC),

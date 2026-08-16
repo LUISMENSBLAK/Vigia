@@ -41,6 +41,12 @@ def test_fire_observations_have_spatial_temporal_and_idempotency_guards() -> Non
     assert "received_at >= observed_at" in sql
 
 
+def test_runtime_queries_have_matching_temporal_indexes() -> None:
+    sql = migration_sql()
+    assert "ingest_runs_started_idx" in sql
+    assert "(entity_type, entity_id, created_at desc)" in sql
+
+
 def test_required_source_catalogue_is_explicit() -> None:
     sql = migration_sql()
     for code in (

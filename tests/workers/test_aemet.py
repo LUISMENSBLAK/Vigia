@@ -1,4 +1,7 @@
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from typing import Any
+from uuid import uuid4
 
 import httpx
 import pytest
@@ -9,6 +12,7 @@ from workers.aemet.client import (
     MissingAemetKeyError,
     parse_aemet_observations,
 )
+from workers.aemet.repository import AemetIngestRun, AemetRepository
 
 
 def test_missing_aemet_key_is_explicit() -> None:
@@ -58,3 +62,31 @@ async def test_rejects_untrusted_data_url() -> None:
     client = AemetClient("test-key", transport=httpx.MockTransport(locator))
     with pytest.raises(AemetPayloadError, match="no autorizada"):
         await client.fetch_observations()
+
+
+class RecordingConnection:
+    def __init__(self) -> None:
+        self.parameters: list[dict[str, Any]] = []
+
+    async def execute(self, _: object, parameters: dict[str, Any]) -> None:
+        self.parameters.append(parameters)
+
+
+class RecordingDatabase:
+    def __init__(self) -> None:
+        self.connection = RecordingConnection()
+
+    @asynccontextmanager
+    async def transaction(self):  # type: ignore[no-untyped-def]
+        yield self.connection
+
+
+async def test_successful_empty_aemet_check_is_operational() -> None:
+    database = RecordingDatabase()
+    repository = AemetRepository(database)  # type: ignore[arg-type]
+    now = datetime.now(UTC)
+    run = AemetIngestRun(id=uuid4(), source_id=uuid4())
+    written = await repository.persist(run, [], code_commit="test", finished_at=now)
+    health = next(item for item in database.connection.parameters if "health_state" in item)
+    assert health["health_state"] == "OPERATIVO"
+    assert written == 0

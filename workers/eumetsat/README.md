@@ -1,8 +1,9 @@
 # EUMETSAT worker
 
-Estado: `EN PREPARACIÓN`. La colección objetivo es MTG FCI Active Fire Monitoring
-`EO:EUM:DAT:0682`. EUMETSAT recomienda su cliente oficial EUMDAC y aplica condiciones de licencia
-dependientes del producto.
+Estado: cliente OAuth/Data Store implementado; verificación LIVE bloqueada por autenticación
+rechazada. La colección objetivo es MTG FCI Active Fire Monitoring `EO:EUM:DAT:0682`. Los
+endpoints siguen el cliente oficial EUMDAC 3.1.1 y las condiciones de licencia dependen del
+producto.
 
 No se han fijado nombres de variables netCDF ni interpretado probabilidad/calidad sin abrir un
 producto real y contrastar su metadata. Esa puerta es deliberada: primero se verificará acceso y

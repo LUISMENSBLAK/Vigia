@@ -47,7 +47,7 @@ function ObservationDetail({ observation }: { observation: FireObservationFeatur
       <h2>{observation.properties.sensor}</h2>
       <dl>
         <div><dt>Fuente</dt><dd>{observation.properties.source}</dd></div>
-        <div><dt>Satélite</dt><dd>{observation.properties.satellite}</dd></div>
+        <div><dt>Satélite</dt><dd>{observation.properties.platform}</dd></div>
         <div><dt>Sensor</dt><dd>{observation.properties.sensor}</dd></div>
         <div><dt>Ubicación</dt><dd>{latitude.toFixed(5)}, {longitude.toFixed(5)}</dd></div>
         <div><dt>Observado</dt><dd>{new Date(observation.properties.observed_at).toISOString()}</dd></div>
@@ -140,7 +140,7 @@ export function MapWorkspace() {
         {selected ? <ObservationDetail observation={selected} /> : (
           <div className="empty-incident">
             <StatusPill state={observations.metadata.data_state} />
-            <h2>{loading ? "Verificando observaciones" : observations.metadata.data_state === "ERROR" ? "NO DISPONIBLE" : "SIN DATOS"}</h2>
+            <h2>{loading ? "Verificando observaciones" : observations.metadata.data_state === "ERROR" ? "NO DISPONIBLE" : "SIN OBSERVACIONES ACTIVAS"}</h2>
             <p>{loading ? "Consultando la API VIGÍA." : observations.metadata.message}</p>
           </div>
         )}

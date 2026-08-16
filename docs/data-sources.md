@@ -2,10 +2,10 @@
 
 | Fuente | Uso previsto | Worker | Estado inicial |
 |---|---|---|---|
-| NASA FIRMS | Hotspots VIIRS/MODIS NRT | `workers/firms` | Ingestión preparada; sin llamada real |
-| AEMET | Observaciones convencionales | `workers/aemet` | Cliente y persistencia preparados; sin llamada real |
-| EUMETSAT MTG FCI AFM | Probabilidad/resultado de fuego y calidad | `workers/eumetsat` | Pendiente |
-| Copernicus Sentinel | Vegetación, cambios, radar y térmica apropiada | `workers/copernicus` | OAuth/Catalog/índices preparados; sin llamada real |
+| NASA FIRMS | Hotspots VIIRS/MODIS NRT | `workers/firms` | LIVE verificado; persistencia remota bloqueada |
+| AEMET | Observaciones convencionales | `workers/aemet` | Endpoint no disponible (HTTP 502) |
+| EUMETSAT MTG FCI AFM | Probabilidad/resultado de fuego y calidad | `workers/eumetsat` | OAuth rechazado; netCDF no verificado |
+| Copernicus Sentinel | Vegetación, cambios, radar y térmica apropiada | `workers/copernicus` | OAuth, Catalog y Process pequeños verificados |
 | PNOA LiDAR/CNIG | Terreno y estructura vegetal derivados | `gis/lidar` | Pendiente |
 | EFFIS | Referencia y benchmark externo | Por definir | Pendiente de licencia/alcance |
 
@@ -15,6 +15,10 @@ la latencia medida lo respalda; de lo contrario se muestra `Observado`, `Recibid
 
 Los datos obsoletos no se reutilizan silenciosamente. Una caída produce `SIN_DATOS`, `DEGRADADO`
 o `ERROR`, mantiene la edad del último dato y permite continuar con evidencia independiente.
+
+Los estados de esta tabla documentan la comprobación del 16 de agosto de 2026. No sustituyen
+`vigia.source_health`: una fuente solo aparece `OPERATIVO` en producto cuando la comprobación queda
+registrada con su timestamp en la base.
 
 ## Licencias y límites verificados documentalmente
 

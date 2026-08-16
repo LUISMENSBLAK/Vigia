@@ -135,3 +135,4 @@ npm run test:e2e
 - [Cumplimiento europeo](docs/eu-compliance.md)
 - [Procedencia](docs/data-provenance.md)
 - [Despliegue](docs/deployment.md)
+- [Auditoría LIVE 2026-08-16](docs/live-integration-audit-2026-08-16.md)

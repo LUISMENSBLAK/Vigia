@@ -224,7 +224,7 @@ class AemetRepository:
                 {
                     "finished_at": finished_at,
                     "source_id": run.source_id,
-                    "health_state": "OPERATIVO" if observations else "SIN_DATOS",
+                    "health_state": "OPERATIVO",
                     "observed_at": latest.observed_at if latest else None,
                     "received_at": latest.received_at if latest else None,
                     "latency": latency,

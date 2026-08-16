@@ -37,7 +37,7 @@ class GeometryPoint(BaseModel):
 class FireObservationProperties(BaseModel):
     id: str
     source: str
-    satellite: str
+    platform: str
     sensor: str
     observed_at: datetime
     received_at: datetime

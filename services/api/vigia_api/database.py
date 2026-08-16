@@ -81,7 +81,7 @@ class VigiaDatabase:
             select
               o.id::text,
               s.name as source,
-              o.platform as satellite,
+              o.platform,
               o.sensor,
               o.observed_at,
               o.received_at,

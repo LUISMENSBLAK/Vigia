@@ -7,7 +7,7 @@ export const emptyObservations: FireObservationCollection = {
   features: [],
   metadata: {
     data_state: "SIN_DATOS",
-    message: "SIN DATOS",
+    message: "SIN OBSERVACIONES ACTIVAS",
     count: 0,
     generated_at: "",
   },

@@ -132,6 +132,33 @@ class CopernicusClient:
         except (httpx.HTTPError, ValueError) as exc:
             raise CopernicusHTTPError("No se pudo completar Copernicus Catalog.") from exc
 
+    async def process(self, request: dict[str, Any]) -> bytes:
+        token = await self.access_token()
+        try:
+            async with httpx.AsyncClient(
+                timeout=self._timeout, transport=self._transport, follow_redirects=False
+            ) as client:
+                response = await client.post(
+                    f"{self._base_url}/api/v1/process",
+                    json=request,
+                    headers={
+                        "Authorization": f"Bearer {token}",
+                        "Accept": "image/tiff",
+                    },
+                )
+            if not 200 <= response.status_code < 300:
+                raise CopernicusHTTPError(
+                    f"Copernicus Process respondió con HTTP {response.status_code}."
+                )
+            content_type = response.headers.get("content-type", "").split(";", 1)[0]
+            if content_type not in {"image/tiff", "image/x-tiff"} or not response.content:
+                raise CopernicusHTTPError("Copernicus Process devolvió un raster inválido.")
+            return response.content
+        except CopernicusError:
+            raise
+        except httpx.HTTPError as exc:
+            raise CopernicusHTTPError("No se pudo completar Copernicus Process.") from exc
+
 
 SENTINEL_COLLECTIONS = {
     "sentinel-1": "sentinel-1-grd",

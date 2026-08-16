@@ -43,6 +43,24 @@ async def test_access_token_is_reused_until_expiry() -> None:
     assert token_calls == 1
 
 
+async def test_process_returns_only_a_valid_tiff() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/token":
+            return httpx.Response(200, json={"access_token": "token-value", "expires_in": 600})
+        assert request.url.path == "/api/v1/process"
+        assert request.headers["authorization"] == "Bearer token-value"
+        return httpx.Response(200, content=b"II*\x00test", headers={"content-type": "image/tiff"})
+
+    client = CopernicusClient(
+        "client-id",
+        "client-secret",
+        token_url="https://identity.test/token",  # noqa: S106
+        base_url="https://sh.test",
+        transport=httpx.MockTransport(handler),
+    )
+    assert await client.process({"small": True}) == b"II*\x00test"
+
+
 def test_sentinel_index_request_uses_aoi_window_and_no_full_scene() -> None:
     request = sentinel_2_index_request(
         bbox=(-5.0, 40.0, -4.0, 41.0),

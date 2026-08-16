@@ -148,6 +148,7 @@ create table vigia.ingest_runs (
 );
 
 create index ingest_runs_source_started_idx on vigia.ingest_runs (source_id, started_at desc);
+create index ingest_runs_started_idx on vigia.ingest_runs (started_at desc);
 create index ingest_runs_running_idx on vigia.ingest_runs (started_at) where state = 'RUNNING';
 
 create table vigia.satellite_products (
@@ -511,7 +512,8 @@ create table vigia.data_provenance (
   created_at timestamptz not null default now()
 );
 
-create index data_provenance_entity_idx on vigia.data_provenance (entity_type, entity_id);
+create index data_provenance_entity_idx
+  on vigia.data_provenance (entity_type, entity_id, created_at desc);
 
 alter table vigia.risk_predictions
   add constraint risk_predictions_provenance_fk

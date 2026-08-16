@@ -274,7 +274,7 @@ async def fire_observations(
             properties=FireObservationProperties(
                 id=row["id"],
                 source=row["source"],
-                satellite=row["satellite"],
+                platform=row["platform"],
                 sensor=row["sensor"],
                 observed_at=row["observed_at"],
                 received_at=row["received_at"],
@@ -292,7 +292,7 @@ async def fire_observations(
     message = (
         "Observaciones térmicas persistidas y trazables."
         if features
-        else "No existen observaciones térmicas persistidas."
+        else "SIN OBSERVACIONES ACTIVAS"
     )
     return FireObservationCollection(
         features=features,

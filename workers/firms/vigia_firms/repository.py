@@ -260,7 +260,7 @@ class FirmsRepository:
                 update_health,
                 {
                     "source_id": run.source_id,
-                    "state": "OPERATIVO" if observations else "SIN_DATOS",
+                    "state": "OPERATIVO",
                     "checked_at": finished_at,
                     "last_observed_at": latest.acquired_at if latest else None,
                     "last_received_at": latest.received_at if latest else None,

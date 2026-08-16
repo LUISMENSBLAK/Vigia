@@ -1,4 +1,7 @@
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from typing import Any
+from uuid import uuid4
 
 import httpx
 import pytest
@@ -13,6 +16,7 @@ from workers.firms.vigia_firms.client import (
     MissingFirmsKeyError,
     parse_firms_csv,
 )
+from workers.firms.vigia_firms.repository import FirmsRepository, IngestRun
 
 
 def test_missing_key_fails_with_exact_variable() -> None:
@@ -87,3 +91,32 @@ async def test_maps_http_error_without_response_body() -> None:
     with pytest.raises(FirmsHTTPError, match="HTTP 503") as raised:
         await client.fetch_area(FirmsSource.VIIRS_NOAA21_NRT)
     assert "internal details" not in str(raised.value)
+
+
+class RecordingConnection:
+    def __init__(self) -> None:
+        self.parameters: list[dict[str, Any]] = []
+
+    async def execute(self, _: object, parameters: dict[str, Any]) -> None:
+        self.parameters.append(parameters)
+
+
+class RecordingDatabase:
+    def __init__(self) -> None:
+        self.connection = RecordingConnection()
+
+    @asynccontextmanager
+    async def transaction(self):  # type: ignore[no-untyped-def]
+        yield self.connection
+
+
+async def test_successful_empty_firms_check_is_operational() -> None:
+    database = RecordingDatabase()
+    repository = FirmsRepository(database)  # type: ignore[arg-type]
+    now = datetime.now(UTC)
+    run = IngestRun(id=uuid4(), source_id=uuid4(), started_at=now)
+    result = await repository.persist(run, [], code_commit="test", finished_at=now)
+    health = next(item for item in database.connection.parameters if "state" in item)
+    assert health["state"] == "OPERATIVO"
+    assert result.records_received == 0
+    assert result.records_written == 0

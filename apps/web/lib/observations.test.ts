@@ -14,7 +14,7 @@ const observation: FireObservationFeature = {
   properties: {
     id: "test-observation",
     source: "NASA FIRMS VIIRS NOAA-20",
-    satellite: "N20",
+    platform: "N20",
     sensor: "VIIRS",
     observed_at: "2026-08-14T07:31:00Z",
     received_at: "2026-08-14T08:00:00Z",
@@ -30,6 +30,7 @@ const observation: FireObservationFeature = {
 describe("thermal observation presentation", () => {
   it("keeps empty and unavailable states distinct", () => {
     expect(emptyObservations.metadata.data_state).toBe("SIN_DATOS");
+    expect(emptyObservations.metadata.message).toBe("SIN OBSERVACIONES ACTIVAS");
     expect(unavailableObservations.metadata.data_state).toBe("ERROR");
     expect(unavailableObservations.metadata.message).toContain("NO DISPONIBLE");
   });
