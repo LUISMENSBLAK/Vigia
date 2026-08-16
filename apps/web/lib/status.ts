@@ -7,8 +7,11 @@ export const unavailableStatus: SystemStatus = {
     {
       source: "API VIGÍA",
       state: "ERROR",
+      checked_at: null,
+      last_observed_at: null,
       last_received_at: null,
       latency_seconds: null,
+      error_code: "API_UNAVAILABLE",
       detail: "No se pudo verificar la API.",
     },
   ],
@@ -25,5 +28,6 @@ export function overallState(status: SystemStatus): "OPERATIVO" | "DEGRADADO" | 
   if (status.sources.some((source) => source.state === "ERROR")) return "ERROR";
   if (status.sources.some((source) => source.state === "DEGRADADO")) return "DEGRADADO";
   if (status.sources.every((source) => source.state === "SIN_DATOS")) return "SIN_DATOS";
-  return "OPERATIVO";
+  if (status.sources.every((source) => source.state === "OPERATIVO")) return "OPERATIVO";
+  return "DEGRADADO";
 }

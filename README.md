@@ -8,16 +8,18 @@ incertidumbre explícitas. España es el ámbito inicial; Ávila y Castilla y Le
 zonas de investigación de alta resolución. El diseño evita hardcodear una región única y puede
 evolucionar hacia cobertura europea.
 
-> Estado: base técnica de fase 1. No es un sistema operativo de emergencias. No contiene
-> incendios, métricas, riesgo ni predicciones simuladas. Todas las fuentes permanecen `SIN_DATOS`
-> hasta que una ingestión real sea configurada y verificada.
+> Estado: fase 1 ampliada con persistencia y superficies live preparadas. No es un sistema
+> operativo de emergencias. No contiene incendios, métricas, riesgo ni predicciones simuladas.
+> Sin credenciales y una ejecución remota verificada, todas las fuentes permanecen `SIN_DATOS`.
 
 ## Arquitectura
 
 ```text
 apps/web              Next.js, React, MapLibre GL y Tailwind CSS
 services/api          FastAPI, Pydantic y observabilidad estructurada
-workers/firms         Primer worker real: NASA FIRMS Area CSV
+workers/firms         NASA FIRMS Area CSV, idempotencia, runs y provenance
+workers/aemet         AEMET observado, normalización y persistencia separada
+workers/copernicus    OAuth2 cacheado, Catalog y requests Sentinel-2 por AOI
 database/migrations   PostGIS, esquemas privados, RLS e índices espaciales
 vigia_ai              Interfaces científicas por motor (siguientes fases)
 gis                    Pipelines raster/LiDAR/terrain (siguientes fases)
@@ -71,7 +73,7 @@ Nunca añadas `SUPABASE_SECRET_KEY`, `SUPABASE_DB_URL`, `NASA_FIRMS_MAP_KEY`, `A
 
 La migración inicial está en `database/migrations/20260816000000_initial_vigia.sql`. Crea PostGIS,
 tipos geoespaciales reales, índices GiST, entidades de procedencia y validación, RLS forzado en las
-tablas internas y una única vista de salud de fuentes mediante `security_invoker`.
+tablas internas, catálogo explícito de fuentes y una vista de salud mediante `security_invoker`.
 
 No se ha aplicado a un proyecto remoto. Antes de hacerlo:
 
@@ -86,8 +88,23 @@ No se ha aplicado a un proyecto remoto. Antes de hacerlo:
 `workers/firms/vigia_firms/client.py` implementa el endpoint oficial Area CSV para
 `VIIRS_NOAA20_NRT`, `VIIRS_NOAA21_NRT`, `VIIRS_SNPP_NRT` y `MODIS_NRT`. Convierte el tiempo de
 adquisición a UTC y conserva fuente, plataforma, instrumento, confianza original, brillo, FRP,
-día/noche y timestamp de ingestión. La persistencia y el clustering espaciotemporal pertenecen a
-la fase 2; no se interpreta cada hotspot como un incendio independiente.
+día/noche, payload original y timestamp de recepción. La persistencia registra runs, aplica una
+clave determinista, evita duplicados y crea provenance con hashes. No se interpreta cada hotspot
+como un incendio independiente; el clustering permanece bloqueado hasta disponer de observaciones
+reales verificadas.
+
+Ejecución, únicamente después de aplicar y verificar la base y configurar `.env`:
+
+```bash
+uv run python -m workers.firms.vigia_firms
+```
+
+## API y mapa
+
+`/v1/fire-observations` devuelve solo filas persistidas como GeoJSON y conserva estado vacío/error.
+`/mapa` usa clustering MapLibre y ofrece una lista textual completa. `/v1/status` y `/estado`
+obtienen PostGIS, salud de fuentes y última ejecución de workers; una credencial por sí sola nunca
+produce `OPERATIVO`.
 
 ## Comprobaciones
 

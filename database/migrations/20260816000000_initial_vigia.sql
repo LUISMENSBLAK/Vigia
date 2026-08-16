@@ -31,6 +31,92 @@ create table vigia.sources (
   created_at timestamptz not null default now()
 );
 
+-- The catalogue records identity and licensing only. A source is not operational until a
+-- successful check writes a separate source_health row.
+insert into vigia.sources (code, name, provider, dataset_version, license_uri, metadata)
+values
+  (
+    'NASA_FIRMS_VIIRS_NOAA20_NRT',
+    'NASA FIRMS VIIRS NOAA-20',
+    'NASA LANCE FIRMS',
+    null,
+    'https://www.earthdata.nasa.gov/engage/open-data-services-software-policies/data-use-guidance',
+    '{"dataset":"VIIRS NOAA-20 375 m Active Fire NRT","processing":"NRT"}'::jsonb
+  ),
+  (
+    'NASA_FIRMS_VIIRS_NOAA21_NRT',
+    'NASA FIRMS VIIRS NOAA-21',
+    'NASA LANCE FIRMS',
+    null,
+    'https://www.earthdata.nasa.gov/engage/open-data-services-software-policies/data-use-guidance',
+    '{"dataset":"VIIRS NOAA-21 375 m Active Fire NRT","processing":"NRT"}'::jsonb
+  ),
+  (
+    'NASA_FIRMS_VIIRS_SNPP_NRT',
+    'NASA FIRMS VIIRS SNPP',
+    'NASA LANCE FIRMS',
+    null,
+    'https://www.earthdata.nasa.gov/engage/open-data-services-software-policies/data-use-guidance',
+    '{"dataset":"VIIRS Suomi-NPP 375 m Active Fire NRT","processing":"NRT"}'::jsonb
+  ),
+  (
+    'NASA_FIRMS_MODIS_NRT',
+    'NASA FIRMS MODIS',
+    'NASA LANCE FIRMS',
+    '6.1',
+    'https://www.earthdata.nasa.gov/engage/open-data-services-software-policies/data-use-guidance',
+    '{"dataset":"MODIS Collection 6.1 Active Fire NRT","processing":"NRT"}'::jsonb
+  ),
+  (
+    'AEMET_OPEN_DATA',
+    'AEMET',
+    'Agencia Estatal de Meteorología',
+    null,
+    'http://publications.europa.eu/resource/authority/licence/CC_BY_4_0',
+    '{"dataset":"AEMET OpenData"}'::jsonb
+  ),
+  (
+    'EUMETSAT_MTG_FCI_AFM',
+    'EUMETSAT MTG FCI',
+    'EUMETSAT',
+    null,
+    'https://user.eumetsat.int/resources/user-guides/data-registration-and-licensing',
+    '{"dataset":"MTG FCI Active Fire Monitoring","collection":"EO:EUM:DAT:0682"}'::jsonb
+  ),
+  (
+    'COPERNICUS_SENTINEL_1',
+    'Copernicus Sentinel-1',
+    'Copernicus Data Space Ecosystem',
+    null,
+    'https://dataspace.copernicus.eu/terms-and-conditions',
+    '{"dataset":"Sentinel-1"}'::jsonb
+  ),
+  (
+    'COPERNICUS_SENTINEL_2',
+    'Copernicus Sentinel-2',
+    'Copernicus Data Space Ecosystem',
+    null,
+    'https://dataspace.copernicus.eu/terms-and-conditions',
+    '{"dataset":"Sentinel-2"}'::jsonb
+  ),
+  (
+    'COPERNICUS_SENTINEL_3',
+    'Copernicus Sentinel-3',
+    'Copernicus Data Space Ecosystem',
+    null,
+    'https://dataspace.copernicus.eu/terms-and-conditions',
+    '{"dataset":"Sentinel-3"}'::jsonb
+  ),
+  (
+    'PNOA_CNIG',
+    'PNOA/CNIG',
+    'Instituto Geográfico Nacional / CNIG',
+    null,
+    'https://www.ign.es/resources/licencia/Condiciones_licenciaUso_IGN.pdf',
+    '{"dataset":"Plan Nacional de Ortofotografía Aérea","license":"CC BY 4.0 compatible"}'::jsonb
+  )
+on conflict (code) do nothing;
+
 create table vigia.source_health (
   source_id uuid primary key references vigia.sources(id) on delete cascade,
   state vigia.source_state not null default 'SIN_DATOS',
@@ -86,13 +172,15 @@ create table vigia.satellite_products (
 
 create index satellite_products_footprint_gist on vigia.satellite_products using gist (footprint);
 create index satellite_products_sensing_idx on vigia.satellite_products (sensing_started_at desc);
+create index satellite_products_ingest_run_idx on vigia.satellite_products (ingest_run_id)
+  where ingest_run_id is not null;
 
 create table vigia.fire_observations (
   id uuid primary key default extensions.gen_random_uuid(),
   source_id uuid not null references vigia.sources(id),
   product_id uuid references vigia.satellite_products(id),
   ingest_run_id uuid not null references vigia.ingest_runs(id),
-  external_id text,
+  external_id text not null,
   observed_at timestamptz not null,
   received_at timestamptz not null,
   location extensions.geography(Point, 4326) not null,
@@ -107,12 +195,20 @@ create table vigia.fire_observations (
   quality jsonb not null default '{}'::jsonb,
   raw_properties jsonb not null,
   created_at timestamptz not null default now(),
-  unique nulls not distinct (source_id, external_id)
+  unique (source_id, external_id),
+  constraint fire_observation_timestamps_ordered check (received_at >= observed_at),
+  constraint fire_observation_brightness_nonnegative check (
+    brightness_kelvin is null or brightness_kelvin >= 0
+  ),
+  constraint fire_observation_frp_nonnegative check (frp_mw is null or frp_mw >= 0)
 );
 
 create index fire_observations_location_gist on vigia.fire_observations using gist (location);
 create index fire_observations_observed_idx on vigia.fire_observations (observed_at desc);
 create index fire_observations_recent_source_idx on vigia.fire_observations (source_id, observed_at desc);
+create index fire_observations_product_idx on vigia.fire_observations (product_id)
+  where product_id is not null;
+create index fire_observations_ingest_run_idx on vigia.fire_observations (ingest_run_id);
 
 create table vigia.fire_incidents (
   id uuid primary key default extensions.gen_random_uuid(),
@@ -146,6 +242,8 @@ create table vigia.observation_evidence (
   primary key (incident_id, observation_id)
 );
 
+create index observation_evidence_observation_idx on vigia.observation_evidence (observation_id);
+
 create table vigia.incident_status_history (
   id bigint generated always as identity primary key,
   incident_id uuid not null references vigia.fire_incidents(id),
@@ -178,11 +276,15 @@ create table vigia.incident_perimeters (
 
 create index incident_perimeters_geometry_gist on vigia.incident_perimeters using gist (geometry);
 create index incident_perimeters_incident_valid_idx on vigia.incident_perimeters (incident_id, valid_at desc);
+create index incident_perimeters_source_idx on vigia.incident_perimeters (source_id)
+  where source_id is not null;
 
 create table vigia.weather_observations (
   id uuid primary key default extensions.gen_random_uuid(),
   source_id uuid not null references vigia.sources(id),
-  station_code text,
+  ingest_run_id uuid not null references vigia.ingest_runs(id),
+  external_id text not null,
+  station_code text not null,
   observed_at timestamptz not null,
   received_at timestamptz not null,
   location extensions.geography(Point, 4326) not null,
@@ -194,11 +296,16 @@ create table vigia.weather_observations (
   gust_ms double precision check (gust_ms is null or gust_ms >= 0),
   precipitation_mm double precision check (precipitation_mm is null or precipitation_mm >= 0),
   pressure_hpa double precision,
-  quality jsonb not null default '{}'::jsonb
+  quality jsonb not null default '{}'::jsonb,
+  raw_properties jsonb not null,
+  constraint weather_observation_timestamps_ordered check (received_at >= observed_at),
+  unique (source_id, external_id)
 );
 
 create index weather_observations_location_gist on vigia.weather_observations using gist (location);
 create index weather_observations_time_idx on vigia.weather_observations (observed_at desc);
+create index weather_observations_source_idx on vigia.weather_observations (source_id);
+create index weather_observations_ingest_run_idx on vigia.weather_observations (ingest_run_id);
 
 create table vigia.weather_forecasts (
   id uuid primary key default extensions.gen_random_uuid(),
@@ -284,6 +391,7 @@ create table vigia.risk_predictions (
 
 create index risk_predictions_geometry_gist on vigia.risk_predictions using gist (geometry);
 create index risk_predictions_valid_idx on vigia.risk_predictions (valid_at desc);
+create index risk_predictions_model_version_idx on vigia.risk_predictions (model_version_id);
 
 create table vigia.forecast_ensembles (
   id uuid primary key default extensions.gen_random_uuid(),
@@ -297,6 +405,9 @@ create table vigia.forecast_ensembles (
   input_snapshot_hash text not null,
   experimental boolean not null default true
 );
+
+create index forecast_ensembles_incident_idx on vigia.forecast_ensembles (incident_id);
+create index forecast_ensembles_model_version_idx on vigia.forecast_ensembles (model_version_id);
 
 create table vigia.spread_predictions (
   id uuid primary key default extensions.gen_random_uuid(),
@@ -326,6 +437,7 @@ create table vigia.historical_fires (
 );
 
 create index historical_fires_perimeter_gist on vigia.historical_fires using gist (final_perimeter);
+create index historical_fires_source_idx on vigia.historical_fires (source_id);
 
 create table vigia.validation_cases (
   id uuid primary key default extensions.gen_random_uuid(),
@@ -338,6 +450,9 @@ create table vigia.validation_cases (
   leakage_checked boolean not null default false,
   constraint validation_case_time_order check (replay_end_at > replay_start_at)
 );
+
+create index validation_cases_historical_fire_idx on vigia.validation_cases (historical_fire_id)
+  where historical_fire_id is not null;
 
 create table vigia.validation_runs (
   id uuid primary key default extensions.gen_random_uuid(),
@@ -353,6 +468,8 @@ create table vigia.validation_runs (
   sample_size integer check (sample_size is null or sample_size >= 0),
   reproducible boolean not null default false
 );
+
+create index validation_runs_model_version_idx on vigia.validation_runs (model_version_id);
 
 create table vigia.model_metrics (
   id bigint generated always as identity primary key,
@@ -377,6 +494,8 @@ create table vigia.alerts (
   acknowledged_by uuid
 );
 
+create index alerts_incident_idx on vigia.alerts (incident_id);
+
 create table vigia.data_provenance (
   id uuid primary key default extensions.gen_random_uuid(),
   entity_type text not null,
@@ -397,6 +516,9 @@ create index data_provenance_entity_idx on vigia.data_provenance (entity_type, e
 alter table vigia.risk_predictions
   add constraint risk_predictions_provenance_fk
   foreign key (provenance_id) references vigia.data_provenance(id);
+
+create index risk_predictions_provenance_idx on vigia.risk_predictions (provenance_id)
+  where provenance_id is not null;
 
 create table vigia.audit_log (
   id bigint generated always as identity primary key,
@@ -452,6 +574,7 @@ select
   h.last_observed_at,
   h.last_received_at,
   h.latency_seconds,
+  h.error_code,
   h.detail
 from vigia.source_health h
 join vigia.sources s on s.id = h.source_id

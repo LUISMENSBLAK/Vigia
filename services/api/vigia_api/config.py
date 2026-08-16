@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,7 +14,14 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     CORS_ALLOWED_ORIGINS: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
     VIGIA_ENABLE_LIVE_DATA: bool = True
-    NASA_FIRMS_MAP_KEY: str | None = None
+    VIGIA_CODE_COMMIT: str = "unavailable"
+    SUPABASE_DB_URL: SecretStr | None = None
+    NASA_FIRMS_MAP_KEY: SecretStr | None = None
+    AEMET_API_KEY: SecretStr | None = None
+    EUMETSAT_CONSUMER_KEY: SecretStr | None = None
+    EUMETSAT_CONSUMER_SECRET: SecretStr | None = None
+    COPERNICUS_CLIENT_ID: SecretStr | None = None
+    COPERNICUS_CLIENT_SECRET: SecretStr | None = None
 
     @field_validator("CORS_ALLOWED_ORIGINS", mode="before")
     @classmethod

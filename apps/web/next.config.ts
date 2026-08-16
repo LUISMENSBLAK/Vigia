@@ -4,13 +4,21 @@ const scriptPolicy = process.env.NODE_ENV === "development"
   ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
   : "script-src 'self' 'unsafe-inline'";
 
+function publicApiOrigin(): string {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").origin;
+  } catch {
+    return "http://localhost:8000";
+  }
+}
+
 const csp = [
   "default-src 'self'",
   scriptPolicy,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://demotiles.maplibre.org",
   "font-src 'self' data:",
-  "connect-src 'self' http://localhost:8000 https://demotiles.maplibre.org",
+  `connect-src 'self' ${publicApiOrigin()} https://demotiles.maplibre.org`,
   "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'self'",

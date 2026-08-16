@@ -22,8 +22,13 @@ Todo timestamp se guarda en `timestamptz` UTC. El frontend podrá mostrar UTC o 
 CRS nunca es implícito: geometrías operativas iniciales usan EPSG:4326 y los procesos métricos
 deberán reproyectar a un CRS adecuado antes de calcular distancias o áreas.
 
-## Fases
+## Puertas actuales
 
-La base actual cubre monorepo, web, API, esquema PostGIS, estado de fuentes y cliente FIRMS. AEMET,
-EUMETSAT, Copernicus, LiDAR, motores de IA, replay y propagación se implementarán en ese orden,
-con una puerta de verificación entre fases.
+La base, la persistencia FIRMS/AEMET, el API GeoJSON, el mapa y el health dinámico están preparados
+y cubiertos por pruebas sin secretos. Copernicus dispone de autenticación cacheada, Catalog y un
+request acotado de índices Sentinel-2. Ninguna de estas piezas equivale a una integración remota
+verificada.
+
+La aplicación remota de PostGIS, los tests de roles, advisors, FIRMS LIVE y la primera persistencia
+permanecen bloqueados por ausencia del proyecto/credenciales VIGÍA. EUMETSAT netCDF, clustering y
+Confidence no cruzarán su puerta hasta disponer de evidencia real suficiente.

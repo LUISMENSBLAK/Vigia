@@ -12,7 +12,9 @@ export function SystemStatusSummary() {
 
   useEffect(() => {
     const controller = new AbortController();
-    loadSystemStatus(controller.signal).then(setStatus).catch(() => setStatus(unavailableStatus));
+    loadSystemStatus(controller.signal).then(setStatus).catch(() => {
+      if (!controller.signal.aborted) setStatus(unavailableStatus);
+    });
     return () => controller.abort();
   }, []);
 

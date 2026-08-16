@@ -12,7 +12,7 @@
   --paper: #f3f1ea;
   --paper-strong: #fffef9;
   --ink: #102521;
-  --muted: #697570;
+  --muted: #5f6b66;
   --line: rgba(16, 37, 33, 0.14);
   --shadow: 0 24px 80px rgba(3, 24, 19, 0.12);
 }
@@ -101,7 +101,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .status-pill--error { color: #ff9b91; }
 .map-header__controls { margin-left: auto; display: flex; gap: .75rem; align-items: center; color: #9bb4aa; font-size: .62rem; }
 .map-header__controls button { height: 34px; border: 1px solid rgba(255,255,255,.16); color: white; background: rgba(255,255,255,.04); }
-.mode-switch { padding: 0 .8rem; border-color: var(--tech-500) !important; color: var(--tech-300) !important; }
+.mode-switch { padding: .55rem .8rem; border: 1px solid var(--tech-500); color: var(--tech-300); }
 .map-language { padding: 0 .65rem; }
 .layers-panel, .incident-panel { min-width: 0; padding: 1.25rem; background: #0b2321; overflow: auto; z-index: 2; }
 .layers-panel { border-right: 1px solid rgba(255,255,255,.1); }
@@ -111,7 +111,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .layer-list { display: grid; margin-top: .8rem; }
 .layer-list label { min-height: 42px; display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: .6rem; border-bottom: 1px solid rgba(255,255,255,.06); color: #d8e5df; font-size: .72rem; }
 .layer-list input { width: 12px; height: 12px; appearance: none; border: 1px solid #789288; background: transparent; }
-.layer-list small { color: #718b81; font-size: .52rem; text-transform: uppercase; }
+.layer-list small { color: #789288; font-size: .52rem; text-transform: uppercase; }
 .panel-note { margin: 1.2rem 0 0; color: #8ca399; font-size: .64rem; line-height: 1.55; }
 .map-stage { position: relative; min-width: 0; min-height: 0; }
 .map-canvas { position: absolute; inset: 0; }
@@ -125,6 +125,16 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .empty-incident p, .accessible-list p { color: #8da49a; font-size: .7rem; line-height: 1.7; }
 .empty-incident a { margin-top: 1rem; color: var(--tech-300); font-size: .66rem; text-decoration: underline; text-underline-offset: 3px; }
 .accessible-list { padding-top: 1.2rem; font-size: .68rem; }
+.accessible-list label { display: block; margin-bottom: .6rem; color: #b9cbc4; font-weight: 700; }
+.accessible-list select { width: 100%; min-height: 42px; padding: .5rem; border: 1px solid rgba(255,255,255,.2); color: #e7f2ed; background: #071b19; }
+.observation-detail h2 { margin: .4rem 0 1.2rem; font-family: Georgia, serif; font-size: 1.8rem; font-weight: 400; }
+.observation-detail dl { margin: 0; }
+.observation-detail dl > div { display: grid; grid-template-columns: 42% 58%; gap: .5rem; padding: .55rem 0; border-bottom: 1px solid rgba(255,255,255,.08); }
+.observation-detail dt { color: #8da49a; font-size: .6rem; text-transform: uppercase; }
+.observation-detail dd { min-width: 0; margin: 0; overflow-wrap: anywhere; font-family: ui-monospace, monospace; font-size: .62rem; }
+.provenance-detail { margin-top: 1rem; padding: .8rem 0; border-top: 1px solid rgba(255,255,255,.1); }
+.provenance-detail summary { cursor: pointer; color: var(--tech-300); font-size: .65rem; font-weight: 700; }
+.provenance-detail p { color: #8da49a; font-size: .65rem; }
 .timeline { grid-column: 1 / -1; display: grid; grid-template-columns: 258px repeat(6, 70px) 1fr; align-items: center; border-top: 1px solid rgba(255,255,255,.1); background: #071b19; z-index: 3; }
 .timeline > div { align-self: stretch; padding-left: 1.25rem; display: grid; align-content: center; border-right: 1px solid rgba(255,255,255,.1); }
 .timeline > div strong { font-size: .74rem; }
@@ -147,6 +157,21 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .language-placeholder { min-height: 100vh; max-width: 760px; margin: auto; padding: 14vh 24px; }
 .language-placeholder h1 { margin: 0; font-family: Georgia, serif; font-size: clamp(3rem, 8vw, 6rem); font-weight: 400; line-height: 1; }
 .language-placeholder > p:not(.eyebrow) { margin: 2rem 0; color: var(--muted); line-height: 1.7; }
+
+.status-page { width: min(1120px, calc(100% - 48px)); margin: auto; padding: 7rem 0 9rem; }
+.status-page > header { max-width: 900px; padding-bottom: 4rem; }
+.status-page h1 { margin: 0; font-family: Georgia, serif; font-size: clamp(3rem, 7vw, 6.2rem); font-weight: 400; letter-spacing: -.04em; line-height: .98; text-wrap: balance; }
+.status-page > header > p:last-child { max-width: 760px; margin-top: 2rem; color: var(--muted); font-size: 1.08rem; line-height: 1.75; }
+.source-status-list { border-top: 1px solid var(--line); }
+.source-row { display: grid; grid-template-columns: 220px 1fr; gap: 2.5rem; padding: 2rem 0; border-bottom: 1px solid var(--line); }
+.source-row header { display: grid; align-content: start; justify-items: start; gap: .75rem; }
+.source-row h2 { margin: 0; font-family: Georgia, serif; font-size: 1.5rem; font-weight: 400; }
+.source-row dl { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem 1.5rem; }
+.source-row dl > div { min-width: 0; }
+.source-row dt { color: var(--muted); font-size: .62rem; letter-spacing: .06em; text-transform: uppercase; }
+.source-row dd { margin: .3rem 0 0; overflow-wrap: anywhere; font-family: ui-monospace, monospace; font-size: .72rem; }
+.source-row > p { grid-column: 2; margin: 0; color: var(--muted); line-height: 1.6; }
+.source-row > code { grid-column: 2; justify-self: start; padding: .25rem .4rem; color: var(--danger-600); background: rgba(184,53,46,.08); font-size: .65rem; }
 
 @media (max-width: 1100px) {
   .site-header nav { display: none; }
@@ -187,6 +212,10 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   .science-page { padding-top: 5rem; }
   .science-page h1 { font-size: clamp(3rem, 14vw, 5rem); }
   .science-sections section { grid-template-columns: 50px 1fr; gap: 1rem; }
+  .status-page { width: min(100% - 32px, 1120px); padding-top: 5rem; }
+  .source-row { grid-template-columns: 1fr; gap: 1.2rem; }
+  .source-row > p, .source-row > code { grid-column: 1; }
+  .source-row dl { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
