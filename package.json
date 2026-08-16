@@ -1,0 +1,17 @@
+{
+  "name": "vigia",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "dev": "npm run dev --workspace @vigia/web",
+    "build": "npm run build --workspace @vigia/web",
+    "lint": "npm run lint --workspace @vigia/web",
+    "typecheck": "npm run typecheck --workspace @vigia/web",
+    "test": "npm run test --workspace @vigia/web",
+    "test:e2e": "npm run test:e2e --workspace @vigia/web"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

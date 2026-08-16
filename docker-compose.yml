@@ -1,0 +1,30 @@
+services:
+  postgis:
+    image: postgis/postgis:17-3.5-alpine
+    environment:
+      POSTGRES_DB: vigia
+      POSTGRES_USER: vigia
+      POSTGRES_PASSWORD: vigia-local-only
+    ports:
+      - "54322:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vigia -d vigia"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - vigia-postgis:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    env_file: .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgis:
+        condition: service_healthy
+
+volumes:
+  vigia-postgis:

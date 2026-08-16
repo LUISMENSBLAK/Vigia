@@ -1,0 +1,1 @@
+"""VIGÍA API package."""

@@ -1,0 +1,1 @@
+"""EUMETSAT MTG ingestion support."""
