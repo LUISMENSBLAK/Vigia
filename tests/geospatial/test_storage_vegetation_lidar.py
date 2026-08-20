@@ -86,3 +86,18 @@ def test_download_manifest_rejects_signed_or_tokenized_urls() -> None:
             aoi_hash="a" * 64,
             request_id="test-run",
         )
+
+
+def test_failed_download_manifest_does_not_invent_checksum_or_size() -> None:
+    manifest = DownloadManifest(
+        provider="PNOA-CNIG",
+        product_id="PNOA-TEST-ONLY.LAZ",
+        source_uri="https://example.invalid/public-product-record",
+        requested_at=datetime(2026, 8, 20, tzinfo=UTC),
+        status=AvailabilityState.ERROR,
+        aoi_hash="a" * 64,
+        request_id="test-failed-download",
+        error_code="PNOA_DOWNLOAD_INCOMPLETE",
+    )
+    assert manifest.size_bytes is None
+    assert manifest.checksum_sha256 is None

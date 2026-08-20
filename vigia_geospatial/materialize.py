@@ -352,17 +352,19 @@ async def materialize(
         source_products["terrain_raw"] = raw_mdt_uri
 
         lidar_count = 0
+        lidar_item = None
+        requested_at = datetime.now(UTC)
         try:
-            if not config.attempt_lidar_download:
-                raise OfficialSourceError(
-                    "Reintento LiDAR omitido tras una descarga incompleta ya verificada."
-                )
             centroid = aoi.geometry.centroid
             lidar_client = CnigLidarClient(verify_tls=config.cnig_verify_tls)
             lidar_item = await lidar_client.locate(
                 longitude=centroid.x, latitude=centroid.y
             )
             requested_at = datetime.now(UTC)
+            if not config.attempt_lidar_download:
+                raise OfficialSourceError(
+                    "Reintento LiDAR omitido tras una descarga incompleta ya verificada."
+                )
             lidar_key = f"raw/pnoa-cnig/{lidar_item.filename}"
             lidar_content = (
                 storage.get(lidar_key)
@@ -420,6 +422,20 @@ async def materialize(
             source_products["lidar_raw"] = raw_lidar_uri
             source_products["lidar_point_count"] = str(validation.point_count)
         except (OfficialSourceError, ValueError):
+            if lidar_item is not None:
+                await repository.persist_download_manifest(
+                    source_code="PNOA_CNIG",
+                    manifest=DownloadManifest(
+                        provider="PNOA-CNIG",
+                        product_id=lidar_item.filename,
+                        source_uri=lidar_item.source_uri,
+                        requested_at=requested_at,
+                        status=AvailabilityState.ERROR,
+                        aoi_hash=aoi.hash,
+                        error_code="PNOA_DOWNLOAD_INCOMPLETE",
+                        request_id=f"phase4b-pnoa-cnig-{aoi.hash[:16]}",
+                    ),
+                )
             await repository.record_source_health(
                 source_code="PNOA_CNIG",
                 service_state="DEGRADADO",

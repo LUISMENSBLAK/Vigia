@@ -21,6 +21,46 @@ class GeospatialRepository:
     def __init__(self, database: VigiaDatabase) -> None:
         self._database = database
 
+    async def persist_download_manifest(
+        self, *, source_code: str, manifest: DownloadManifest
+    ) -> None:
+        async with self._database.transaction() as connection:
+            source_id = await connection.scalar(
+                text("select id from vigia.sources where code = :source_code"),
+                {"source_code": source_code},
+            )
+            if source_id is None:
+                raise GeospatialPersistenceError(f"Falta la fuente {source_code}.")
+            await connection.execute(
+                text(
+                    """
+                    insert into vigia.download_manifests (
+                      source_id, product_id, source_uri, requested_at, downloaded_at,
+                      size_bytes, checksum_sha256, etag, status, aoi_hash,
+                      error_code, request_id
+                    ) values (
+                      :source_id, :product_id, :source_uri, :requested_at, :downloaded_at,
+                      :size_bytes, :checksum_sha256, :etag,
+                      cast(:status as vigia.geospatial_availability), :aoi_hash,
+                      :error_code, :request_id
+                    )
+                    on conflict (source_id, product_id, aoi_hash) do update set
+                      downloaded_at = excluded.downloaded_at,
+                      size_bytes = excluded.size_bytes,
+                      checksum_sha256 = excluded.checksum_sha256,
+                      etag = excluded.etag,
+                      status = excluded.status,
+                      error_code = excluded.error_code,
+                      request_id = excluded.request_id
+                    """
+                ),
+                {
+                    "source_id": source_id,
+                    **manifest.model_dump(mode="python"),
+                    "status": manifest.status.value,
+                },
+            )
+
     async def persist_administrative_units(
         self,
         units: list[AdministrativeUnit],

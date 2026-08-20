@@ -19,6 +19,8 @@ León, Ávila, municipios asociados y Segovia como segunda provincia de control.
   La descarga llegó incompleta en los intentos realizados; validación y publicación `BLOCKED`.
   Tras esos intentos, la configuración de esta ejecución desactiva solo la repetición de la
   transferencia; el materializador nacional mantiene el intento habilitado por defecto.
+  El producto descubierto conserva un manifiesto `ERROR` idempotente y sanitizado; no se asignan
+  tamaño ni checksum a una descarga que no terminó.
 - Copernicus Data Space: OAuth, catálogo Sentinel-2 L2A y Process API sobre una AOI pequeña.
 - IGN/IDEE WFS ocupación del suelo: `lcv:LandCoverUnit`, dataset `siose_ar2017`, nomenclatura
   `CODIIGEValue`; el cliente pagina y conserva geometría/provenance.
