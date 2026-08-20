@@ -68,6 +68,87 @@ class FireObservationCollection(BaseModel):
     metadata: FireObservationMetadata
 
 
+class IncidentProperties(BaseModel):
+    id: str
+    code: str
+    state: str
+    first_signal_at: datetime
+    last_observation_at: datetime
+    observation_count: int = Field(ge=0)
+    source_families: list[str]
+    evidence_strength: str | None = None
+    data_quality: str
+    data_age_seconds: int = Field(ge=0)
+    stale: bool
+
+
+class IncidentFeature(BaseModel):
+    type: Literal["Feature"] = "Feature"
+    geometry: GeometryPoint
+    properties: IncidentProperties
+
+
+class IncidentCollectionMetadata(BaseModel):
+    data_state: Literal["EXPERIMENTAL", "SIN_DATOS", "ERROR"]
+    message: str
+    count: int = Field(ge=0)
+    generated_at: datetime
+
+
+class IncidentCollection(BaseModel):
+    type: Literal["FeatureCollection"] = "FeatureCollection"
+    features: list[IncidentFeature]
+    metadata: IncidentCollectionMetadata
+
+
+class IncidentDetail(BaseModel):
+    id: str
+    code: str
+    state: str
+    centroid: GeometryPoint
+    first_signal_at: datetime
+    last_observation_at: datetime
+    processed_at: datetime | None = None
+    observation_count: int = Field(ge=0)
+    source_families: list[str]
+    evidence_strength: str | None = None
+    reason_codes: list[str]
+    explanations: list[str]
+    missing_information: list[str]
+    persistence: dict[str, Any]
+    data_quality: str
+    stale: bool
+    rule_version: str | None = None
+    configuration_hash: str | None = None
+
+
+class IncidentEvidence(BaseModel):
+    observation_id: str
+    role: Literal["confirming", "contradicting", "context"]
+    source: str
+    platform: str
+    sensor: str
+    observed_at: datetime
+    received_at: datetime
+    coordinates: tuple[float, float]
+    confidence_raw: str | None = None
+    frp_mw: float | None = None
+    brightness_kelvin: float | None = None
+    provenance: dict[str, Any] | None = None
+
+
+class IncidentHistoryEntry(BaseModel):
+    previous_state: str | None = None
+    state: str
+    changed_at: datetime
+    changed_by: str
+    reason_codes: list[str]
+    configuration_hash: str | None = None
+    software_version: str | None = None
+    rule_version: str | None = None
+    commit_sha: str | None = None
+
+
 def current_status(
     *,
     live_enabled: bool,

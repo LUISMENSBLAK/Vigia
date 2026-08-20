@@ -1,10 +1,15 @@
 from pathlib import Path
 
 MIGRATION = Path("database/migrations/20260816000000_initial_vigia.sql")
+PHASE3_MIGRATION = Path("database/migrations/20260820000000_phase3_fusion.sql")
 
 
 def migration_sql() -> str:
     return MIGRATION.read_text(encoding="utf-8").casefold()
+
+
+def phase3_sql() -> str:
+    return PHASE3_MIGRATION.read_text(encoding="utf-8").casefold()
 
 
 def test_migration_keeps_private_and_api_schemas() -> None:
@@ -62,3 +67,44 @@ def test_required_source_catalogue_is_explicit() -> None:
         "pnoa_cnig",
     ):
         assert code in sql
+
+
+def test_phase3_adds_fusion_provenance_and_idempotent_candidates() -> None:
+    sql = phase3_sql()
+    assert "create table vigia.fusion_runs" in sql
+    assert "configuration_hash text not null" in sql
+    assert "create table vigia.incident_candidates" in sql
+    assert "unique (fusion_run_id, candidate_key)" in sql
+    assert "create table vigia.fusion_run_incidents" in sql
+    assert "add column last_fusion_as_of timestamptz" in sql
+
+
+def test_phase3_preserves_evidence_roles_and_immutable_history() -> None:
+    sql = phase3_sql()
+    assert "create table vigia.incident_context_evidence" in sql
+    assert "evidence_role in ('contradicting', 'context')" in sql
+    assert "add column previous_state vigia.incident_state" in sql
+    assert "add column fusion_run_id uuid references vigia.fusion_runs" in sql
+
+
+def test_phase3_prepares_empty_real_context_tables_without_seed_data() -> None:
+    sql = phase3_sql()
+    assert "create table vigia.known_heat_sources" in sql
+    assert "create table vigia.controlled_burn_context" in sql
+    assert "insert into vigia.known_heat_sources" not in sql
+    assert "insert into vigia.controlled_burn_context" not in sql
+
+
+def test_phase3_internal_tables_are_forced_behind_rls() -> None:
+    sql = phase3_sql()
+    for table in (
+        "fusion_runs",
+        "incident_candidates",
+        "fusion_run_incidents",
+        "incident_context_evidence",
+        "known_heat_sources",
+        "controlled_burn_context",
+    ):
+        assert f"alter table vigia.{table} enable row level security" in sql
+        assert f"alter table vigia.{table} force row level security" in sql
+    assert "from public, anon, authenticated" in sql

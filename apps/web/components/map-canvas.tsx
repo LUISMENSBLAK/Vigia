@@ -5,17 +5,36 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef } from "react";
 import * as maplibregl from "maplibre-gl";
 
-import type { FireObservationCollection, FireObservationFeature } from "@/lib/types";
+import type {
+  FireObservationCollection,
+  FireObservationFeature,
+  IncidentCollection,
+  IncidentFeature,
+} from "@/lib/types";
 
 interface MapCanvasProps {
   observations: FireObservationCollection;
-  onSelect: (observation: FireObservationFeature) => void;
+  incidents: IncidentCollection;
+  showObservations: boolean;
+  showIncidents: boolean;
+  onSelectObservation: (observation: FireObservationFeature) => void;
+  onSelectIncident: (incident: IncidentFeature) => void;
 }
 
-export function MapCanvas({ observations, onSelect }: MapCanvasProps) {
+export function MapCanvas({
+  observations,
+  incidents,
+  showObservations,
+  showIncidents,
+  onSelectObservation,
+  onSelectIncident,
+}: MapCanvasProps) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const observationsRef = useRef(observations);
+  const incidentsRef = useRef(incidents);
+  const showObservationsRef = useRef(showObservations);
+  const showIncidentsRef = useRef(showIncidents);
 
   useEffect(() => {
     if (!container.current) return;
@@ -42,6 +61,7 @@ export function MapCanvas({ observations, onSelect }: MapCanvasProps) {
         type: "circle",
         source: "thermal-observations",
         filter: ["has", "point_count"],
+        layout: { visibility: showObservationsRef.current ? "visible" : "none" },
         paint: {
           "circle-color": "#d9772e",
           "circle-radius": ["step", ["get", "point_count"], 15, 20, 19, 100, 24],
@@ -50,12 +70,42 @@ export function MapCanvas({ observations, onSelect }: MapCanvasProps) {
           "circle-opacity": 0.88,
         },
       });
+      map.addSource("derived-incidents", {
+        type: "geojson",
+        data: incidentsRef.current,
+      });
+      map.addLayer({
+        id: "incident-points",
+        type: "circle",
+        source: "derived-incidents",
+        layout: { visibility: showIncidentsRef.current ? "visible" : "none" },
+        paint: {
+          "circle-color": [
+            "match",
+            ["get", "state"],
+            "VIGILANCIA", "#839a91",
+            "ANOMALIA", "#c69a48",
+            "POSIBLE_IGNICION", "#d57a35",
+            "PROBABLE_INCENDIO", "#ad5b38",
+            "INCENDIO_CONFIRMADO", "#b8352e",
+            "DESCARTADO", "#66736e",
+            "#839a91",
+          ],
+          "circle-radius": [
+            "interpolate", ["linear"], ["get", "observation_count"], 2, 8, 20, 15,
+          ],
+          "circle-stroke-color": "#fffef9",
+          "circle-stroke-width": 2,
+          "circle-opacity": 0.9,
+        },
+      });
       map.addLayer({
         id: "thermal-cluster-count",
         type: "symbol",
         source: "thermal-observations",
         filter: ["has", "point_count"],
         layout: {
+          "visibility": showObservationsRef.current ? "visible" : "none",
           "text-field": ["get", "point_count_abbreviated"],
           "text-size": 11,
         },
@@ -66,6 +116,7 @@ export function MapCanvas({ observations, onSelect }: MapCanvasProps) {
         type: "circle",
         source: "thermal-observations",
         filter: ["!", ["has", "point_count"]],
+        layout: { visibility: showObservationsRef.current ? "visible" : "none" },
         paint: {
           "circle-color": "#e17a2d",
           "circle-radius": 5,
@@ -87,9 +138,16 @@ export function MapCanvas({ observations, onSelect }: MapCanvasProps) {
         const selected = observationsRef.current.features.find(
           (observation) => observation.properties.id === id,
         );
-        if (selected) onSelect(selected);
+        if (selected) onSelectObservation(selected);
       });
-      for (const layer of ["thermal-clusters", "thermal-points"]) {
+      map.on("click", "incident-points", (event) => {
+        const id = event.features?.[0]?.properties?.id;
+        const selected = incidentsRef.current.features.find(
+          (incident) => incident.properties.id === id,
+        );
+        if (selected) onSelectIncident(selected);
+      });
+      for (const layer of ["thermal-clusters", "thermal-points", "incident-points"]) {
         map.on("mouseenter", layer, () => {
           map.getCanvas().style.cursor = "pointer";
         });
@@ -102,7 +160,7 @@ export function MapCanvas({ observations, onSelect }: MapCanvasProps) {
       mapRef.current = null;
       map.remove();
     };
-  }, [onSelect]);
+  }, [onSelectIncident, onSelectObservation]);
 
   useEffect(() => {
     observationsRef.current = observations;
@@ -112,6 +170,38 @@ export function MapCanvas({ observations, onSelect }: MapCanvasProps) {
     source?.setData(observations);
   }, [observations]);
 
+  useEffect(() => {
+    incidentsRef.current = incidents;
+    const source = mapRef.current?.getSource("derived-incidents") as
+      | maplibregl.GeoJSONSource
+      | undefined;
+    source?.setData(incidents);
+  }, [incidents]);
+
+  useEffect(() => {
+    showObservationsRef.current = showObservations;
+    for (const layer of ["thermal-clusters", "thermal-cluster-count", "thermal-points"]) {
+      if (mapRef.current?.getLayer(layer)) {
+        mapRef.current.setLayoutProperty(
+          layer,
+          "visibility",
+          showObservations ? "visible" : "none",
+        );
+      }
+    }
+  }, [showObservations]);
+
+  useEffect(() => {
+    showIncidentsRef.current = showIncidents;
+    if (mapRef.current?.getLayer("incident-points")) {
+      mapRef.current.setLayoutProperty(
+        "incident-points",
+        "visibility",
+        showIncidents ? "visible" : "none",
+      );
+    }
+  }, [showIncidents]);
+
   return (
     <div
       ref={container}
@@ -119,8 +209,8 @@ export function MapCanvas({ observations, onSelect }: MapCanvasProps) {
       role="region"
       aria-label={
         observations.features.length
-          ? `Mapa de España con ${observations.features.length} observaciones térmicas reales`
-          : "Mapa base de España sin observaciones térmicas disponibles"
+          ? `Mapa de España con ${observations.features.length} observaciones térmicas y ${incidents.features.length} incidentes derivados`
+          : `Mapa base de España con ${incidents.features.length} incidentes derivados`
       }
     />
   );

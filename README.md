@@ -21,7 +21,8 @@ workers/firms         NASA FIRMS Area CSV, idempotencia, runs y provenance
 workers/aemet         AEMET observado, normalización y persistencia separada
 workers/copernicus    OAuth2 cacheado, Catalog y requests Sentinel-2 por AOI
 database/migrations   PostGIS, esquemas privados, RLS e índices espaciales
-vigia_ai              Interfaces científicas por motor (siguientes fases)
+vigia_ai              Fusión/detección research y contratos científicos por motor
+config                 Parámetros versionados del baseline de fusión
 gis                    Pipelines raster/LiDAR/terrain (siguientes fases)
 docs                   Decisiones auditables y metodología
 tests                  API, workers y pruebas científicas deterministas
@@ -75,6 +76,10 @@ La migración inicial está en `database/migrations/20260816000000_initial_vigia
 tipos geoespaciales reales, índices GiST, entidades de procedencia y validación, RLS forzado en las
 tablas internas, catálogo explícito de fuentes y una vista de salud mediante `security_invoker`.
 
+La migración `20260820000000_phase3_fusion.sql` añade runs, candidatos, asociaciones, historial y
+contextos vacíos de fuentes térmicas/quemadas, todos internos y con RLS forzado. Ninguna migración
+se considera aplicada remotamente sin verificación real.
+
 No se ha aplicado a un proyecto remoto. Antes de hacerlo:
 
 1. revisar la migración en una rama;
@@ -93,6 +98,10 @@ clave determinista, evita duplicados y crea provenance con hashes. No se interpr
 como un incendio independiente; el clustering permanece bloqueado hasta disponer de observaciones
 reales verificadas.
 
+El baseline de Fase 3 ya puede agrupar observaciones persistidas de forma determinista, pero todavía
+no se ha ejecutado contra una muestra PostGIS real. Los tests sintéticos validan ingeniería, no
+precisión científica.
+
 Ejecución, únicamente después de aplicar y verificar la base y configurar `.env`:
 
 ```bash
@@ -101,8 +110,9 @@ uv run python -m workers.firms.vigia_firms
 
 ## API y mapa
 
-`/v1/fire-observations` devuelve solo filas persistidas como GeoJSON y conserva estado vacío/error.
-`/mapa` usa clustering MapLibre y ofrece una lista textual completa. `/v1/status` y `/estado`
+`/v1/fire-observations` devuelve solo filas persistidas como GeoJSON. `/api/incidents` y sus rutas
+de detalle/evidence/history exponen únicamente incidentes públicos derivados. `/mapa` separa capas
+de observaciones e incidentes y ofrece listas textuales completas. `/v1/status` y `/estado`
 obtienen PostGIS, salud de fuentes y última ejecución de workers; una credencial por sí sola nunca
 produce `OPERATIVO`.
 
@@ -125,6 +135,13 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
+Reprocesamiento Fase 3, únicamente con migraciones y `.env` verificados:
+
+```bash
+uv run python -m vigia_ai.fusion --from 2026-08-20T00:00:00Z \
+  --to 2026-08-20T23:59:59Z --as-of 2026-08-20T23:59:59Z
+```
+
 ## Documentación
 
 - [Arquitectura](docs/architecture.md)
@@ -134,5 +151,7 @@ npm run test:e2e
 - [Seguridad](docs/security.md)
 - [Cumplimiento europeo](docs/eu-compliance.md)
 - [Procedencia](docs/data-provenance.md)
+- [Fusion Engine](docs/fusion-engine.md)
+- [Detection Engine](docs/detection-engine.md)
 - [Despliegue](docs/deployment.md)
 - [Auditoría LIVE 2026-08-16](docs/live-integration-audit-2026-08-16.md)

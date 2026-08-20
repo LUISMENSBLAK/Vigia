@@ -32,3 +32,11 @@ verificada.
 La aplicación remota de PostGIS, los tests de roles, advisors, FIRMS LIVE y la primera persistencia
 permanecen bloqueados por ausencia del proyecto/credenciales VIGÍA. EUMETSAT netCDF, clustering y
 Confidence no cruzarán su puerta hasta disponer de evidencia real suficiente.
+
+## Fase 3: fusión y detección
+
+La cadena ahora separa `ObservationEvidence`, candidato, incidente persistido y recomendación de
+estado. Fusion es determinista, configurable y compatible con `as_of`; Detection usa reglas y una
+máquina de estados sin confirmación automática. FastAPI expone solo incidentes `public_visible` y
+evidencia sanitizada. Las tablas de runs, candidatos y contexto permanecen internas con RLS
+forzado. Ver `docs/fusion-engine.md` y `docs/detection-engine.md`.

@@ -103,3 +103,125 @@ async def test_database_error_is_sanitized(monkeypatch: pytest.MonkeyPatch) -> N
     assert database_status["state"] == "ERROR"
     assert database_status["error_code"] == "DATABASE_UNAVAILABLE"
     assert "sensitive" not in database_status["detail"]
+
+
+INCIDENT_ID = "11111111-1111-4111-8111-111111111111"
+
+
+class IncidentDatabase(FakeDatabase):
+    async def incidents(self, *, limit: int) -> list[dict[str, object]]:
+        assert limit == 25
+        return [
+            {
+                "id": INCIDENT_ID,
+                "code": "VIGIA-SYNTHETIC",
+                "state": "ANOMALIA",
+                "first_signal_at": datetime(2026, 8, 20, 12, 0, tzinfo=UTC),
+                "last_observation_at": datetime(2026, 8, 20, 12, 10, tzinfo=UTC),
+                "observation_count": 2,
+                "source_families": ["NASA_VIIRS"],
+                "evidence_strength": "MEDIA",
+                "data_quality": "COMPLETA",
+                "stale": False,
+                "longitude": 0.0,
+                "latitude": 0.0,
+                "data_age_seconds": 60,
+            }
+        ]
+
+    async def incident(self, incident_id: str) -> dict[str, object] | None:
+        assert incident_id == INCIDENT_ID
+        return {
+            "id": INCIDENT_ID,
+            "code": "VIGIA-SYNTHETIC",
+            "state": "ANOMALIA",
+            "first_signal_at": datetime(2026, 8, 20, 12, 0, tzinfo=UTC),
+            "last_observation_at": datetime(2026, 8, 20, 12, 10, tzinfo=UTC),
+            "processed_at": datetime(2026, 8, 20, 12, 11, tzinfo=UTC),
+            "observation_count": 2,
+            "source_families": ["NASA_VIIRS"],
+            "evidence_strength": "MEDIA",
+            "reason_codes": ["MULTI_SENSOR_AGREEMENT"],
+            "explanation": {
+                "why": ["2 observaciones térmicas compatibles"],
+                "missing_information": ["segunda familia térmica"],
+            },
+            "persistence": {"detection_count": 2},
+            "data_quality": "COMPLETA",
+            "stale": False,
+            "rule_version": "detection-rules-v1",
+            "configuration_hash": "a" * 64,
+            "longitude": 0.0,
+            "latitude": 0.0,
+        }
+
+    async def incident_evidence(self, incident_id: str) -> list[dict[str, object]]:
+        assert incident_id == INCIDENT_ID
+        return [
+            {
+                "observation_id": "synthetic-observation",
+                "role": "confirming",
+                "source": "SYNTHETIC TEST DATA",
+                "platform": "N20",
+                "sensor": "VIIRS",
+                "observed_at": datetime(2026, 8, 20, 12, 0, tzinfo=UTC),
+                "received_at": datetime(2026, 8, 20, 12, 5, tzinfo=UTC),
+                "longitude": 0.0,
+                "latitude": 0.0,
+                "confidence_raw": "n",
+                "frp_mw": 2.0,
+                "brightness_kelvin": 320.0,
+                "provenance": {"dataset": "SYNTHETIC TEST DATA"},
+            }
+        ]
+
+    async def incident_history(self, incident_id: str) -> list[dict[str, object]]:
+        assert incident_id == INCIDENT_ID
+        return [
+            {
+                "previous_state": "VIGILANCIA",
+                "state": "ANOMALIA",
+                "changed_at": datetime(2026, 8, 20, 12, 11, tzinfo=UTC),
+                "changed_by": "fusion_engine",
+                "reason": "MULTI_SENSOR_AGREEMENT",
+                "configuration_hash": "a" * 64,
+                "software_version": "vigia/0.3.0",
+                "rule_version": "detection-rules-v1",
+                "commit_sha": "test",
+            }
+        ]
+
+
+async def test_incident_geojson_is_empty_without_persistence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(main, "database", None)
+    payload = (await request("/api/incidents")).json()
+    assert payload["type"] == "FeatureCollection"
+    assert payload["features"] == []
+    assert payload["metadata"]["data_state"] == "SIN_DATOS"
+
+
+async def test_incident_api_exposes_state_without_probability(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(main, "database", IncidentDatabase())
+    payload = (await request("/api/incidents?limit=25")).json()
+    properties = payload["features"][0]["properties"]
+    assert properties["state"] == "ANOMALIA"
+    assert properties["source_families"] == ["NASA_VIIRS"]
+    assert "probability" not in properties
+
+
+async def test_incident_detail_evidence_and_history_are_structured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(main, "database", IncidentDatabase())
+    detail = (await request(f"/api/incidents/{INCIDENT_ID}")).json()
+    evidence = (await request(f"/api/incidents/{INCIDENT_ID}/evidence")).json()
+    history = (await request(f"/api/incidents/{INCIDENT_ID}/history")).json()
+    assert detail["evidence_strength"] == "MEDIA"
+    assert detail["missing_information"] == ["segunda familia térmica"]
+    assert "calibrated_probability" not in detail
+    assert evidence[0]["role"] == "confirming"
+    assert history[0]["previous_state"] == "VIGILANCIA"

@@ -42,9 +42,69 @@ export interface FireObservationCollection {
   type: "FeatureCollection";
   features: FireObservationFeature[];
   metadata: {
+    data_state: SourceState | "EXPERIMENTAL";
+    message: string;
+    count: number;
+    generated_at: string;
+  };
+}
+
+export type IncidentState =
+  | "VIGILANCIA"
+  | "ANOMALIA"
+  | "POSIBLE_IGNICION"
+  | "PROBABLE_INCENDIO"
+  | "INCENDIO_CONFIRMADO"
+  | "DESCARTADO";
+
+export interface IncidentProperties {
+  id: string;
+  code: string;
+  state: IncidentState;
+  first_signal_at: string;
+  last_observation_at: string;
+  observation_count: number;
+  source_families: string[];
+  evidence_strength: "MUY_BAJA" | "BAJA" | "MEDIA" | "ALTA" | "MUY_ALTA" | null;
+  data_quality: "COMPLETA" | "PARCIAL" | "DEGRADADA" | "DESCONOCIDA";
+  data_age_seconds: number;
+  stale: boolean;
+}
+
+export interface IncidentFeature {
+  type: "Feature";
+  geometry: { type: "Point"; coordinates: [number, number] };
+  properties: IncidentProperties;
+}
+
+export interface IncidentCollection {
+  type: "FeatureCollection";
+  features: IncidentFeature[];
+  metadata: {
     data_state: SourceState;
     message: string;
     count: number;
     generated_at: string;
   };
+}
+
+export interface IncidentDetail {
+  id: string;
+  code: string;
+  state: IncidentState;
+  centroid: { type: "Point"; coordinates: [number, number] };
+  first_signal_at: string;
+  last_observation_at: string;
+  processed_at: string | null;
+  observation_count: number;
+  source_families: string[];
+  evidence_strength: string | null;
+  reason_codes: string[];
+  explanations: string[];
+  missing_information: string[];
+  persistence: Record<string, unknown>;
+  data_quality: string;
+  stale: boolean;
+  rule_version: string | null;
+  configuration_hash: string | null;
 }

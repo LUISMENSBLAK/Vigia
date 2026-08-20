@@ -1,0 +1,65 @@
+{
+  "version": "fusion-baseline-v1",
+  "rule_version": "detection-rules-v1",
+  "max_age_minutes": 360,
+  "persistence_window_minutes": 20,
+  "candidate_expiration_minutes": 180,
+  "incident_min_observations": 2,
+  "possible_ignition_min_observations": 3,
+  "possible_ignition_min_persistence_minutes": 10,
+  "probable_fire_min_observations": 4,
+  "probable_fire_min_thermal_families": 2,
+  "probable_fire_min_persistence_minutes": 20,
+  "source_profiles": {
+    "NASA_VIIRS": {
+      "spatial_resolution_m": 375,
+      "association_radius_m": 1250,
+      "max_temporal_gap_minutes": 45
+    },
+    "NASA_MODIS": {
+      "spatial_resolution_m": 1000,
+      "association_radius_m": 2500,
+      "max_temporal_gap_minutes": 90
+    },
+    "EUMETSAT_MTG": {
+      "spatial_resolution_m": 2000,
+      "association_radius_m": 4000,
+      "max_temporal_gap_minutes": 30
+    },
+    "COPERNICUS_OPTICAL": {
+      "spatial_resolution_m": 20,
+      "association_radius_m": 750,
+      "max_temporal_gap_minutes": 720
+    },
+    "COPERNICUS_RADAR": {
+      "spatial_resolution_m": 20,
+      "association_radius_m": 750,
+      "max_temporal_gap_minutes": 720
+    },
+    "COPERNICUS_THERMAL": {
+      "spatial_resolution_m": 1000,
+      "association_radius_m": 2500,
+      "max_temporal_gap_minutes": 180
+    },
+    "AEMET_WEATHER": {
+      "spatial_resolution_m": 10000,
+      "association_radius_m": 15000,
+      "max_temporal_gap_minutes": 60
+    },
+    "TERRAIN": {
+      "spatial_resolution_m": 25,
+      "association_radius_m": 1000,
+      "max_temporal_gap_minutes": 525600
+    },
+    "VEGETATION": {
+      "spatial_resolution_m": 20,
+      "association_radius_m": 2000,
+      "max_temporal_gap_minutes": 10080
+    },
+    "UNKNOWN": {
+      "spatial_resolution_m": 2000,
+      "association_radius_m": 2500,
+      "max_temporal_gap_minutes": 45
+    }
+  }
+}

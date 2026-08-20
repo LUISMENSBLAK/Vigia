@@ -2,10 +2,10 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import structlog
-from fastapi import FastAPI, Query, Request, Response
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
@@ -17,6 +17,13 @@ from .models import (
     FireObservationMetadata,
     FireObservationProperties,
     GeometryPoint,
+    IncidentCollection,
+    IncidentCollectionMetadata,
+    IncidentDetail,
+    IncidentEvidence,
+    IncidentFeature,
+    IncidentHistoryEntry,
+    IncidentProperties,
     SourceHealth,
     SourceState,
     SystemStatus,
@@ -303,3 +310,157 @@ async def fire_observations(
             generated_at=generated_at,
         ),
     )
+
+
+@app.get("/api/incidents", response_model=IncidentCollection, tags=["incidents"])
+async def incidents(
+    limit: int = Query(default=1000, ge=1, le=5000),
+) -> IncidentCollection:
+    generated_at = datetime.now(UTC)
+    if database is None:
+        return IncidentCollection(
+            features=[],
+            metadata=IncidentCollectionMetadata(
+                data_state="SIN_DATOS",
+                message="SIN INCIDENTES DERIVADOS: falta persistencia verificable.",
+                count=0,
+                generated_at=generated_at,
+            ),
+        )
+    try:
+        rows = await database.incidents(limit=limit)
+    except DatabaseUnavailableError:
+        return IncidentCollection(
+            features=[],
+            metadata=IncidentCollectionMetadata(
+                data_state="ERROR",
+                message="NO DISPONIBLE: no se pudieron consultar incidentes.",
+                count=0,
+                generated_at=generated_at,
+            ),
+        )
+    features = [
+        IncidentFeature(
+            geometry=GeometryPoint(coordinates=(row["longitude"], row["latitude"])),
+            properties=IncidentProperties(
+                id=row["id"],
+                code=row["code"],
+                state=row["state"],
+                first_signal_at=row["first_signal_at"],
+                last_observation_at=row["last_observation_at"],
+                observation_count=row["observation_count"],
+                source_families=list(row["source_families"]),
+                evidence_strength=row["evidence_strength"],
+                data_quality=row["data_quality"],
+                data_age_seconds=row["data_age_seconds"],
+                stale=row["stale"],
+            ),
+        )
+        for row in rows
+    ]
+    return IncidentCollection(
+        features=features,
+        metadata=IncidentCollectionMetadata(
+            data_state="EXPERIMENTAL" if features else "SIN_DATOS",
+            message=(
+                "EXPERIMENTAL: incidentes derivados mediante reglas reproducibles."
+                if features
+                else "SIN INCIDENTES DERIVADOS"
+            ),
+            count=len(features),
+            generated_at=generated_at,
+        ),
+    )
+
+
+def _require_database() -> VigiaDatabase:
+    if database is None:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE: falta persistencia.")
+    return database
+
+
+@app.get("/api/incidents/{incident_id}", response_model=IncidentDetail, tags=["incidents"])
+async def incident_detail(incident_id: UUID) -> IncidentDetail:
+    active_database = _require_database()
+    try:
+        row = await active_database.incident(str(incident_id))
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc
+    if row is None:
+        raise HTTPException(status_code=404, detail="Incidente no encontrado.")
+    explanation = row["explanation"] or {}
+    return IncidentDetail(
+        id=row["id"],
+        code=row["code"],
+        state=row["state"],
+        centroid=GeometryPoint(coordinates=(row["longitude"], row["latitude"])),
+        first_signal_at=row["first_signal_at"],
+        last_observation_at=row["last_observation_at"],
+        processed_at=row["processed_at"],
+        observation_count=row["observation_count"],
+        source_families=list(row["source_families"]),
+        evidence_strength=row["evidence_strength"],
+        reason_codes=list(row["reason_codes"]),
+        explanations=list(explanation.get("why", [])),
+        missing_information=list(explanation.get("missing_information", [])),
+        persistence=dict(row["persistence"] or {}),
+        data_quality=row["data_quality"],
+        stale=row["stale"],
+        rule_version=row["rule_version"],
+        configuration_hash=row["configuration_hash"],
+    )
+
+
+@app.get(
+    "/api/incidents/{incident_id}/evidence",
+    response_model=list[IncidentEvidence],
+    tags=["incidents"],
+)
+async def incident_evidence(incident_id: UUID) -> list[IncidentEvidence]:
+    try:
+        rows = await _require_database().incident_evidence(str(incident_id))
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc
+    return [
+        IncidentEvidence(
+            observation_id=row["observation_id"],
+            role=row["role"],
+            source=row["source"],
+            platform=row["platform"],
+            sensor=row["sensor"],
+            observed_at=row["observed_at"],
+            received_at=row["received_at"],
+            coordinates=(row["longitude"], row["latitude"]),
+            confidence_raw=row["confidence_raw"],
+            frp_mw=row["frp_mw"],
+            brightness_kelvin=row["brightness_kelvin"],
+            provenance=row["provenance"],
+        )
+        for row in rows
+    ]
+
+
+@app.get(
+    "/api/incidents/{incident_id}/history",
+    response_model=list[IncidentHistoryEntry],
+    tags=["incidents"],
+)
+async def incident_history(incident_id: UUID) -> list[IncidentHistoryEntry]:
+    try:
+        rows = await _require_database().incident_history(str(incident_id))
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc
+    return [
+        IncidentHistoryEntry(
+            previous_state=row["previous_state"],
+            state=row["state"],
+            changed_at=row["changed_at"],
+            changed_by=row["changed_by"],
+            reason_codes=[code for code in str(row["reason"] or "").split(",") if code],
+            configuration_hash=row["configuration_hash"],
+            software_version=row["software_version"],
+            rule_version=row["rule_version"],
+            commit_sha=row["commit_sha"],
+        )
+        for row in rows
+    ]

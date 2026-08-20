@@ -138,3 +138,141 @@ class VigiaDatabase:
         except (SQLAlchemyError, OSError) as exc:
             raise DatabaseUnavailableError("No se pudo consultar la ejecución de workers.") from exc
         return dict(row) if row is not None else None
+
+    async def incidents(self, *, limit: int = 1000) -> list[dict[str, Any]]:
+        statement = text(
+            """
+            select id::text, code, state::text, first_signal_at, last_observation_at,
+              observation_count, source_families, evidence_strength::text,
+              fusion_data_quality::text as data_quality, stale,
+              extensions.st_x(centroid::extensions.geometry) as longitude,
+              extensions.st_y(centroid::extensions.geometry) as latitude,
+              greatest(0, extract(epoch from (now() - last_observation_at)))::bigint
+                as data_age_seconds
+            from vigia.fire_incidents
+            where public_visible = true
+            order by last_observation_at desc, code
+            limit :limit
+            """
+        )
+        return await self._mapped_query(
+            statement, {"limit": limit}, "No se pudieron consultar los incidentes."
+        )
+
+    async def incident(self, incident_id: str) -> dict[str, Any] | None:
+        statement = text(
+            """
+            select id::text, code, state::text, first_signal_at, last_observation_at,
+              processed_at, observation_count, source_families, evidence_strength::text,
+              reason_codes, explanation, persistence,
+              fusion_data_quality::text as data_quality, stale,
+              rule_version, configuration_hash,
+              extensions.st_x(centroid::extensions.geometry) as longitude,
+              extensions.st_y(centroid::extensions.geometry) as latitude
+            from vigia.fire_incidents
+            where id = cast(:incident_id as uuid) and public_visible = true
+            """
+        )
+        try:
+            async with self._engine.connect() as connection:
+                row = (
+                    await connection.execute(statement, {"incident_id": incident_id})
+                ).mappings().one_or_none()
+        except (SQLAlchemyError, OSError) as exc:
+            raise DatabaseUnavailableError("No se pudo consultar el incidente.") from exc
+        return dict(row) if row is not None else None
+
+    async def incident_evidence(self, incident_id: str) -> list[dict[str, Any]]:
+        statement = text(
+            """
+            with public_evidence as (
+            select o.id::text as observation_id, evidence.evidence_role as role,
+              source.name as source, o.platform, o.sensor, o.observed_at, o.received_at,
+              extensions.st_x(o.location::extensions.geometry) as longitude,
+              extensions.st_y(o.location::extensions.geometry) as latitude,
+              o.confidence_raw, o.frp_mw, o.brightness_kelvin,
+              case when provenance.id is null then null else jsonb_build_object(
+                'dataset', provenance.dataset,
+                'dataset_version', provenance.dataset_version,
+                'source_timestamp', provenance.source_timestamp,
+                'transformation', provenance.transformation,
+                'code_commit', provenance.code_commit,
+                'output_hash', provenance.output_hash
+              ) end as provenance
+            from vigia.observation_evidence evidence
+            join vigia.fire_incidents incident on incident.id = evidence.incident_id
+              and incident.public_visible = true
+            join vigia.fire_observations o on o.id = evidence.observation_id
+            join vigia.sources source on source.id = o.source_id
+            left join lateral (
+              select item.* from vigia.data_provenance item
+              where item.entity_type = 'fire_observation' and item.entity_id = o.id
+              order by item.created_at desc limit 1
+            ) provenance on true
+            where evidence.incident_id = cast(:incident_id as uuid)
+            union all
+            select weather.id::text, context.evidence_role,
+              source.name, 'GROUND_STATION', weather.station_code,
+              weather.observed_at, weather.received_at,
+              extensions.st_x(weather.location::extensions.geometry),
+              extensions.st_y(weather.location::extensions.geometry),
+              null::text, null::double precision, null::double precision,
+              case when provenance.id is null then null else jsonb_build_object(
+                'dataset', provenance.dataset,
+                'dataset_version', provenance.dataset_version,
+                'source_timestamp', provenance.source_timestamp,
+                'transformation', provenance.transformation,
+                'code_commit', provenance.code_commit,
+                'output_hash', provenance.output_hash
+              ) end
+            from vigia.incident_context_evidence context
+            join vigia.fire_incidents incident on incident.id = context.incident_id
+              and incident.public_visible = true
+            join vigia.weather_observations weather on weather.id = context.entity_id
+              and context.entity_type = 'weather_observation'
+            join vigia.sources source on source.id = weather.source_id
+            left join lateral (
+              select item.* from vigia.data_provenance item
+              where item.entity_type = 'weather_observation'
+                and item.entity_id = weather.id
+              order by item.created_at desc limit 1
+            ) provenance on true
+            where context.incident_id = cast(:incident_id as uuid)
+            )
+            select * from public_evidence order by observed_at, observation_id
+            """
+        )
+        return await self._mapped_query(
+            statement,
+            {"incident_id": incident_id},
+            "No se pudo consultar la evidencia del incidente.",
+        )
+
+    async def incident_history(self, incident_id: str) -> list[dict[str, Any]]:
+        statement = text(
+            """
+            select history.previous_state::text, history.state::text, history.changed_at,
+              history.changed_by, history.reason, history.configuration_hash,
+              history.software_version, history.rule_version, history.commit_sha
+            from vigia.incident_status_history history
+            join vigia.fire_incidents incident on incident.id = history.incident_id
+              and incident.public_visible = true
+            where history.incident_id = cast(:incident_id as uuid)
+            order by history.changed_at, history.id
+            """
+        )
+        return await self._mapped_query(
+            statement,
+            {"incident_id": incident_id},
+            "No se pudo consultar el historial del incidente.",
+        )
+
+    async def _mapped_query(
+        self, statement: Any, parameters: dict[str, Any], safe_error: str
+    ) -> list[dict[str, Any]]:
+        try:
+            async with self._engine.connect() as connection:
+                rows = (await connection.execute(statement, parameters)).mappings().all()
+        except (SQLAlchemyError, OSError) as exc:
+            raise DatabaseUnavailableError(safe_error) from exc
+        return [dict(row) for row in rows]

@@ -23,3 +23,10 @@ reutilizable vive en módulos; notebooks solo documentan exploración y llaman e
 La primera versión será físico-estadística y experimental. Generará ensembles, P10/P50/P90 y mapas
 de probabilidad de afectación. Toda salida llevará: `PREDICCIÓN EXPERIMENTAL — NO USAR PARA
 DECISIONES OPERATIVAS` hasta completar una validación apropiada.
+
+## Baseline de fusión y detección
+
+Fusión usa distancia geodésica, ventanas temporales, resolución, familias, persistencia y contexto.
+Detection devuelve estados, reason codes y `evidence_strength` discreta. Esta fuerza no es una
+probabilidad calibrada. `INCENDIO_CONFIRMADO` no puede ser emitido automáticamente. Confidence
+recibe un `EvidenceBundle`, continúa en research y obliga `calibrated_probability = null`.

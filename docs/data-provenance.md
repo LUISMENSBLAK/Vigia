@@ -18,3 +18,8 @@ repetición idempotente registra su propio `ingest_run`, pero no duplica observa
 
 AEMET aplica el mismo patrón con estación y timestamp. `OBSERVADO` es un valor explícito del modelo;
 los futuros datos `INTERPOLADO` y `PRONOSTICADO` deberán recorrer contratos separados.
+
+Cada ejecución de fusión conserva `as_of`, rango observado, configuración canónica y hash, versión,
+commit, familias, conteos y candidatos. Las asociaciones son idempotentes. Cada transición de
+incidente conserva estado anterior/nuevo, reason codes, snapshot de observaciones, run, regla,
+software, commit y configuration hash; el historial no se sobrescribe.

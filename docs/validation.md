@@ -21,3 +21,10 @@ Tiempo: primera observación, alerta, probable y confirmado.
 El objetivo de investigación de precision ≥99,9 % para `INCENDIO_CONFIRMADO` no es una métrica del
 sistema. Solo podría publicarse tras un test independiente suficientemente grande, junto a N,
 intervalo de confianza, recall, dataset, periodo y versión.
+
+## Puertas de Fase 3
+
+Las pruebas sintéticas validan geodistancia, ventanas, clustering, determinismo, idempotencia,
+persistencia temporal, contradicciones, transiciones y no leakage con `as_of`. No validan precisión
+científica. Antes de calibrar deben prepararse positivos, negativos, fuentes térmicas recurrentes y
+separaciones espaciales/temporales reales. Ningún resultado sintético aparece en la API LIVE.

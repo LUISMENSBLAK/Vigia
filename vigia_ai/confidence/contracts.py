@@ -16,12 +16,30 @@ class EvidenceDescriptor(BaseModel):
     persistence_count: int = Field(ge=1)
     confidence_raw: str | None = None
     input_hash: str
+    source_family: str | None = None
+    evidence_role: Literal["confirming", "contradicting", "context"] = "confirming"
+    quality: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
+
+
+class EvidenceBundle(BaseModel):
+    candidate_id: str
+    evidence: list[EvidenceDescriptor]
+    source_families: list[str]
+    approximate_independence_note: str
+    persistence_seconds: int = Field(ge=0)
+    spatial_extent_m: float = Field(ge=0)
+    meteorology_available: bool
+    vegetation_available: bool
+    known_heat_source_match: bool
+    contradiction_count: int = Field(ge=0)
+    configuration_hash: str
 
 
 class ResearchConfidenceAssessment(BaseModel):
     status: Literal["research"] = "research"
     engine_version: str
     evidence: list[EvidenceDescriptor]
+    bundle: EvidenceBundle | None = None
     spatial_consistency_evaluated: bool
     temporal_consistency_evaluated: bool
     meteorology_evaluated: bool

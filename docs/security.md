@@ -14,3 +14,7 @@
 La migración revoca escrituras a `anon` y `authenticated`. Aplicar la migración no sustituye una
 auditoría: antes de producción deben ejecutarse Supabase Database Advisors, análisis de
 dependencias, pruebas de roles y revisión de exposición del Data API.
+
+Las tablas Fase 3 (`fusion_runs`, candidatos, asociaciones y contextos) tienen RLS habilitado y
+forzado, sin grants de navegador. La API filtra `public_visible`, valida UUID/limits y no devuelve
+payloads originales ni secretos. Los hashes de provenance expuestos no contienen credenciales.

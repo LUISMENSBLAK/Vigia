@@ -10,8 +10,22 @@ import {
   observationLabel,
   unavailableObservations,
 } from "@/lib/observations";
-import type { FireObservationCollection, FireObservationFeature } from "@/lib/types";
+import {
+  emptyIncidents,
+  incidentLabel,
+  loadIncidentDetail,
+  loadIncidents,
+  unavailableIncidents,
+} from "@/lib/incidents";
+import type {
+  FireObservationCollection,
+  FireObservationFeature,
+  IncidentCollection,
+  IncidentDetail,
+  IncidentFeature,
+} from "@/lib/types";
 
+import { IncidentDetailPanel } from "./incident-detail";
 import { StatusPill } from "./status-pill";
 import { SystemStatusSummary } from "./system-status";
 import { VigiaLogo } from "./vigia-logo";
@@ -21,7 +35,6 @@ const MapCanvas = dynamic(() => import("./map-canvas").then((module) => module.M
 });
 
 const inactiveLayers = [
-  "Incidentes",
   "MTG-FCI",
   "Sentinel",
   "Meteorología",
@@ -73,29 +86,66 @@ function ObservationDetail({ observation }: { observation: FireObservationFeatur
 
 export function MapWorkspace() {
   const [observations, setObservations] = useState<FireObservationCollection>(emptyObservations);
-  const [selected, setSelected] = useState<FireObservationFeature | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [incidents, setIncidents] = useState<IncidentCollection>(emptyIncidents);
+  const [selectedObservation, setSelectedObservation] = useState<FireObservationFeature | null>(null);
+  const [selectedIncident, setSelectedIncident] = useState<IncidentFeature | null>(null);
+  const [incidentDetail, setIncidentDetail] = useState<IncidentDetail | null>(null);
+  const [observationsLoading, setObservationsLoading] = useState(true);
+  const [incidentsLoading, setIncidentsLoading] = useState(true);
+  const [showObservations, setShowObservations] = useState(true);
+  const [showIncidents, setShowIncidents] = useState(true);
 
   useEffect(() => {
     const controller = new AbortController();
     loadFireObservations(controller.signal)
       .then((collection) => {
         setObservations(collection);
-        setSelected(collection.features[0] ?? null);
       })
       .catch(() => {
         if (!controller.signal.aborted) setObservations(unavailableObservations);
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!controller.signal.aborted) setObservationsLoading(false);
       });
     return () => controller.abort();
   }, []);
 
-  const selectObservation = useCallback((observation: FireObservationFeature) => {
-    setSelected(observation);
+  useEffect(() => {
+    const controller = new AbortController();
+    loadIncidents(controller.signal)
+      .then(setIncidents)
+      .catch(() => {
+        if (!controller.signal.aborted) setIncidents(unavailableIncidents);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIncidentsLoading(false);
+      });
+    return () => controller.abort();
   }, []);
-  const hasData = observations.features.length > 0;
+
+  useEffect(() => {
+    if (!selectedIncident) return;
+    const controller = new AbortController();
+    loadIncidentDetail(selectedIncident.properties.id, controller.signal)
+      .then(setIncidentDetail)
+      .catch(() => {
+        if (!controller.signal.aborted) setIncidentDetail(null);
+      });
+    return () => controller.abort();
+  }, [selectedIncident]);
+
+  const selectObservation = useCallback((observation: FireObservationFeature) => {
+    setSelectedObservation(observation);
+    setSelectedIncident(null);
+    setIncidentDetail(null);
+  }, []);
+  const selectIncident = useCallback((incident: IncidentFeature) => {
+    setSelectedIncident(incident);
+    setSelectedObservation(null);
+  }, []);
+  const hasObservations = observations.features.length > 0;
+  const hasIncidents = incidents.features.length > 0;
+  const loading = observationsLoading || incidentsLoading;
 
   return (
     <main className="map-shell">
@@ -109,13 +159,27 @@ export function MapWorkspace() {
       </header>
       <aside className="layers-panel" aria-label="Capas del mapa">
         <div className="panel-heading">
-          <span>Capas de análisis</span><small>{hasData ? "1 activa" : "0 activas"}</small>
+          <span>Capas de análisis</span>
+          <small>{Number(showObservations) + Number(showIncidents)} activas</small>
         </div>
         <div className="layer-list">
           <label>
-            <input type="checkbox" checked={hasData} disabled={!hasData} readOnly />
-            <span>Anomalías térmicas</span>
-            <small>{loading ? "Verificando" : hasData ? observations.metadata.count : "Sin datos"}</small>
+            <input
+              type="checkbox"
+              checked={showObservations}
+              onChange={(event) => setShowObservations(event.target.checked)}
+            />
+            <span>Observaciones térmicas</span>
+            <small>{observationsLoading ? "Verificando" : observations.metadata.count}</small>
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={showIncidents}
+              onChange={(event) => setShowIncidents(event.target.checked)}
+            />
+            <span>Incidentes derivados</span>
+            <small>{incidentsLoading ? "Verificando" : incidents.metadata.count}</small>
           </label>
           {inactiveLayers.map((layer) => (
             <label key={layer}>
@@ -130,33 +194,63 @@ export function MapWorkspace() {
         </p>
       </aside>
       <section className="map-stage" aria-label="Área cartográfica">
-        <MapCanvas observations={observations} onSelect={selectObservation} />
+        <MapCanvas
+          observations={observations}
+          incidents={incidents}
+          showObservations={showObservations}
+          showIncidents={showIncidents}
+          onSelectObservation={selectObservation}
+          onSelectIncident={selectIncident}
+        />
         <div className={`map-notice map-notice--${observations.metadata.data_state.toLowerCase()}`} role="status">
           <strong>{loading ? "VERIFICANDO" : observations.metadata.data_state}</strong>
-          <span>{loading ? "Consultando observaciones persistidas…" : observations.metadata.message}</span>
+          <span>
+            {loading
+              ? "Consultando observaciones e incidentes persistidos…"
+              : `${observations.metadata.message} · ${incidents.metadata.message}`}
+          </span>
+        </div>
+        <div className="map-legend" aria-label="Simbología de incidentes">
+          <strong>Incidentes</strong>
+          <span><i className="legend-watch" />Vigilancia</span>
+          <span><i className="legend-anomaly" />Anomalía</span>
+          <span><i className="legend-possible" />Posible ignición</span>
+          <span><i className="legend-probable" />Probable incendio</span>
         </div>
       </section>
       <aside className="incident-panel" aria-label="Detalle y alternativa textual de observaciones">
-        {selected ? <ObservationDetail observation={selected} /> : (
+        {selectedIncident ? (
+          <IncidentDetailPanel
+            incident={selectedIncident}
+            detail={incidentDetail?.id === selectedIncident.properties.id ? incidentDetail : null}
+          />
+        ) : selectedObservation ? (
+          <ObservationDetail observation={selectedObservation} />
+        ) : (
           <div className="empty-incident">
-            <StatusPill state={observations.metadata.data_state} />
-            <h2>{loading ? "Verificando observaciones" : observations.metadata.data_state === "ERROR" ? "NO DISPONIBLE" : "SIN OBSERVACIONES ACTIVAS"}</h2>
-            <p>{loading ? "Consultando la API VIGÍA." : observations.metadata.message}</p>
+            <StatusPill state={incidents.metadata.data_state} />
+            <h2>{loading ? "Verificando evidencia" : "Sin incidentes verificados"}</h2>
+            <p>
+              {loading
+                ? "Consultando la API VIGÍA."
+                : "Selecciona una observación o un incidente derivado. Ningún hotspot aislado equivale a un incendio."}
+            </p>
           </div>
         )}
         <div id="observation-list" className="accessible-list">
           <label htmlFor="observation-selector">Lista textual de observaciones</label>
-          {hasData ? (
+          {hasObservations ? (
             <select
               id="observation-selector"
-              value={selected?.properties.id ?? ""}
+              value={selectedObservation?.properties.id ?? ""}
               onChange={(event) => {
                 const observation = observations.features.find(
                   (item) => item.properties.id === event.target.value,
                 );
-                if (observation) setSelected(observation);
+                if (observation) selectObservation(observation);
               }}
             >
+              <option value="">Seleccionar observación</option>
               {observations.features.map((observation) => (
                 <option key={observation.properties.id} value={observation.properties.id}>
                   {observationLabel(observation)}
@@ -164,6 +258,26 @@ export function MapWorkspace() {
               ))}
             </select>
           ) : <p>{loading ? "Verificando…" : observations.metadata.message}</p>}
+          <label htmlFor="incident-selector">Lista textual de incidentes derivados</label>
+          {hasIncidents ? (
+            <select
+              id="incident-selector"
+              value={selectedIncident?.properties.id ?? ""}
+              onChange={(event) => {
+                const incident = incidents.features.find(
+                  (item) => item.properties.id === event.target.value,
+                );
+                if (incident) selectIncident(incident);
+              }}
+            >
+              <option value="">Seleccionar incidente</option>
+              {incidents.features.map((incident) => (
+                <option key={incident.properties.id} value={incident.properties.id}>
+                  {incidentLabel(incident)}
+                </option>
+              ))}
+            </select>
+          ) : <p>{incidentsLoading ? "Verificando…" : incidents.metadata.message}</p>}
         </div>
       </aside>
       <footer className="timeline" aria-label="Horizonte temporal">

@@ -8,3 +8,7 @@ El contrato de research obliga `calibrated_probability = null`. No existe todav�
 combine evidencias: una media de confidence de sensores sería científicamente inválida. Solo una
 versión calibrada, validada por región/tiempo y acompañada de model card podrá producir una
 probabilidad futura.
+
+Fase 3 añade `EvidenceBundle`: familias, nota de independencia aproximada, persistencia, extensión,
+contexto disponible, contradicciones y configuration hash. Sigue siendo un contrato de entrada; no
+calcula ni muestra porcentajes.
