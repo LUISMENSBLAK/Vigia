@@ -12,7 +12,7 @@ del piloto es:
 | Copernicus histórico | `UNAVAILABLE EN EL CORTE` | La consulta no produjo un producto Sentinel-2 con adquisición/publicación elegible antes del corte del caso; no se añadió ningún producto posterior. |
 | EUMETSAT MTG | `NO DISPONIBLE` | OAuth continúa rechazado con `invalid_client`; MTG histórico no participa. |
 | PostGIS Fase 6 | `VERIFICADO` | 7/7 tablas, 10/10 índices, RLS forzado 7/7, cero grants cliente de escritura, aislamiento LIVE y trigger de manifest inmutable. |
-| Replay real persistido | `VERIFICADO` | Run `6745601e-d768-49d1-8191-0f3e8685c704`, hash `9b946260…`, manifest `f09dc118…`; 199 steps, determinista y `live_state_mutated=false`. |
+| Replay real persistido | `VERIFICADO` | Run final `3466811d-4678-4612-8b62-4693eb0d501c`, hash `1057b447…`, commit `acab51bb…`; 199 steps, determinista y `live_state_mutated=false`. |
 | API Replay | `VERIFICADO` | `/health`, cases, run, timeline y observaciones respondieron; 0 observaciones en T0 y 1.482 al final, sin campos truth. |
 | Suite unitaria/build | `GREEN` | Vitest 15/15, Pytest 128/128, TypeScript, ESLint, Next build, Ruff y mypy. |
 | Playwright | `BLOCKED` | Chromium instalado, pero el sandbox denegó `MachPortRendezvousServer` con código 1100 antes de abrir página. |
@@ -38,6 +38,13 @@ entró al motor. No había perímetro oficial en esta fuente: `NO DISPONIBLE`.
   `PARTIAL_DATE_ONLY_NOT_FWI_READY` y no se convirtieron en FWI;
 - wall time del motor: 206.434 ms; pico aproximado `tracemalloc`: 12.685.477 bytes;
 - estado canónico LIVE mutado: `false`.
+
+El run final con checkpoint por step registró 613.320 ms y pico aproximado 12.693.773 bytes. No es
+directamente comparable con el run inicial: incluye serialización/reemplazo atómico del historial
+completo de steps. Una segunda invocación reanudó desde el step 198, devolvió el mismo run ID y no
+creó duplicados: una fila por `run_hash`, 199 steps y los 199 `output_hash` idénticos al run inicial.
+La serialización completa por step es una limitación de rendimiento conocida; un formato
+incremental queda `EN PREPARACIÓN`.
 
 El matching se ejecutó solo después del Replay con
 `evaluation-spatiotemporal-v1` (15 km, 48 h): 7 incidentes Replay únicos, 2 compatibles con la
