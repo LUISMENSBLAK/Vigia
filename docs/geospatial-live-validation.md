@@ -47,7 +47,8 @@ No se infiere su resultado desde SQL.
 
 ## Resultado materializado
 
-La ejecución con commit `28313230cdc0713734879d72394e0f12fbace94a` produjo y persistió:
+La ejecución final del materializador con commit
+`2a43e41567a62425b1444969ed57136eb73e9c7f` produjo y persistió:
 
 - 6 unidades administrativas: país, comunidad, 2 provincias y 2 municipios;
 - 4 COG de terreno de 5 m en EPSG:25830: elevación, pendiente, orientación y ruggedness;
