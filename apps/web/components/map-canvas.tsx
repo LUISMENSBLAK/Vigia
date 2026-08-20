@@ -5,7 +5,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef } from "react";
 import * as maplibregl from "maplibre-gl";
 
-import { geospatialTileUrl } from "@/lib/geospatial";
+import { formatGeospatialAge, geospatialTileUrl } from "@/lib/geospatial";
 import type {
   FireObservationCollection,
   FireObservationFeature,
@@ -292,6 +292,9 @@ export function MapCanvas({
         const properties = event.features?.[0]?.properties;
         if (!properties || !event.lngLat) return;
         const observedAt = properties.observed_at || "NO DISPONIBLE";
+        const age = formatGeospatialAge(
+          properties.observed_at || properties.processed_at || null,
+        );
         const resolution = properties.output_resolution_m
           ? `${properties.output_resolution_m} m`
           : "NO DISPONIBLE";
@@ -302,6 +305,7 @@ export function MapCanvas({
               + `Estado: ${String(properties.availability)}<br>`
               + `Fuente: ${String(properties.source)}<br>`
               + `Fecha: ${String(observedAt)}<br>`
+              + `Edad: ${age}<br>`
               + `Resolución: ${String(resolution)}`,
           )
           .addTo(map);

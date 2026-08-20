@@ -38,6 +38,17 @@ export function geospatialTileUrl(productId: string): string {
   return `${API_BASE_URL}/api/geospatial/tiles/${encodeURIComponent(productId)}/{z}/{x}/{y}.png`;
 }
 
+export function formatGeospatialAge(value: string | null, now = new Date()): string {
+  if (!value) return "NO DISPONIBLE";
+  const timestamp = new Date(value);
+  if (Number.isNaN(timestamp.getTime())) return "NO DISPONIBLE";
+  const seconds = Math.max(0, Math.floor((now.getTime() - timestamp.getTime()) / 1000));
+  if (seconds >= 86_400) return `${Math.floor(seconds / 86_400)} d`;
+  if (seconds >= 3_600) return `${Math.floor(seconds / 3_600)} h`;
+  if (seconds >= 60) return `${Math.floor(seconds / 60)} min`;
+  return `${seconds} s`;
+}
+
 export function layerAvailability(
   layers: GeospatialLayerStatus[],
   acceptedLayers: string[],
