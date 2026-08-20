@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -10,6 +10,7 @@ from workers.aemet.client import (
     AemetClient,
     AemetPayloadError,
     MissingAemetKeyError,
+    parse_aemet_daily_climate,
     parse_aemet_hourly_forecasts,
     parse_aemet_observations,
 )
@@ -54,6 +55,31 @@ def test_parses_only_observed_station_values() -> None:
 def test_rejects_forecast_shaped_or_incomplete_data() -> None:
     with pytest.raises(AemetPayloadError):
         parse_aemet_observations([{"idema": "2444"}], received_at=datetime.now(UTC))
+
+
+def test_daily_climate_preserves_date_only_and_is_not_fwi_ready() -> None:
+    rows = parse_aemet_daily_climate(
+        [
+            {
+                "fecha": "2025-08-15",
+                "indicativo": "2661",
+                "nombre": "LEÓN, VIRGEN DEL CAMINO",
+                "provincia": "LEON",
+                "tmed": "23,4",
+                "tmin": "14,2",
+                "tmax": "32,6",
+                "hrMedia": "35",
+                "velmedia": "3,1",
+                "racha": "12,5",
+                "prec": "Ip",
+            }
+        ]
+    )
+    assert rows[0].calendar_date == date(2025, 8, 15)
+    assert rows[0].temperature_mean_c == 23.4
+    assert rows[0].precipitation_24h_mm is None
+    assert rows[0].quality["temporal_precision"] == "DATE_ONLY"
+    assert rows[0].quality["fwi_compatible"] is False
 
 
 def test_hourly_forecast_keeps_probability_separate_from_precipitation_amount() -> None:

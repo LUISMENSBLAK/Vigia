@@ -60,3 +60,13 @@ REGCAN95/UTM 28N (EPSG:4083) para Canarias. La API transforma a EPSG:4326.
 
 Una respuesta sin ejecución real persiste como `UNAVAILABLE`; nunca se rellena con una
 estimación sintética.
+
+## Soporte Replay y System Card
+
+Estado: `EXPERIMENTAL / UNVALIDATED`. El baseline acepta reloj y contexto históricos sin cambiar
+su fórmula. FWI necesita estado previo válido y warm-up por estación; nunca toma un estado posterior
+a `as_of`. La inicialización de temporada documentada solo puede usarse con criterios aplicables y
+se rotula `INITIALIZED_NOT_OBSERVED`. AEMET diario sin hora de mediodía no basta. Ausencias,
+resoluciones incompatibles o precipitación insuficiente producen `UNAVAILABLE` o calidad parcial,
+nunca imputaciones silenciosas. Replay no transforma el índice experimental en probabilidad ni
+permite que hotspots sean una entrada causal.

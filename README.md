@@ -8,7 +8,7 @@ incertidumbre explícitas. España es el ámbito inicial; Ávila y Castilla y Le
 zonas de investigación de alta resolución. El diseño evita hardcodear una región única y puede
 evolucionar hacia cobertura europea.
 
-> Estado: Fase 4 geoespacial en foundation. No es un sistema operativo de emergencias. Los hotspots
+> Estado: Fase 6 corpus histórico y Replay en foundation. No es un sistema operativo de emergencias. Los hotspots
 > son observaciones, no incendios; los incidentes derivados no se confirman automáticamente. La
 > disponibilidad de cada fuente o capa depende de una comprobación fechada y persistida.
 
@@ -21,7 +21,7 @@ workers/firms         NASA FIRMS Area CSV, idempotencia, runs y provenance
 workers/aemet         AEMET observado, normalización y persistencia separada
 workers/copernicus    OAuth2 cacheado, Catalog y requests Sentinel-2 por AOI
 database/migrations   PostGIS, esquemas privados, RLS e índices espaciales
-vigia_ai              Fusión/detección research y contratos científicos por motor
+vigia_ai              Fusión, detección, riesgo, corpus histórico y Replay científico
 vigia_geospatial       AOI nacional, raster/COG, terreno, vegetación, LiDAR y storage
 config                 Parámetros versionados del baseline de fusión
 docs                   Decisiones auditables y metodología
@@ -84,6 +84,9 @@ La migración `20260820010000_phase4_geospatial.sql` añade unidades administrat
 catálogo de productos geoespaciales, manifests y runs por AOI. Los raster permanecen fuera de
 PostgreSQL. Antes de aplicar cualquier migración en otro entorno:
 
+Fase 6 añade `20260820040000_phase6_historical_replay.sql`: referencias históricas versionadas,
+precisión temporal, perímetros con provenance y almacenamiento Replay aislado con RLS forzado.
+
 1. revisar la migración en una rama;
 2. ejecutar en una base desechable;
 3. comprobar geometrías, grants y políticas;
@@ -123,6 +126,9 @@ Fase 4 añade `/api/geospatial/layers`, `/api/geospatial/coverage` y
 `/api/geospatial/context`; Fase 4B añade `/api/geospatial/tiles/{product_id}/{z}/{x}/{y}.png` y
 materialización real por AOI. El catálogo conserva fecha, resolución, calidad, cobertura y
 provenance; un valor raster inexistente responde `NO DISPONIBLE`.
+
+Fase 6 añade `/api/replay/cases`, `/api/replay/runs` y timeline/incidentes de ejecución. `/replay`
+oculta la referencia oficial durante la ejecución y solo la muestra al activar comparación.
 
 ## Comprobaciones
 
@@ -174,3 +180,8 @@ uv run python -m vigia_ai.fusion --from 2026-08-20T00:00:00Z \
 - [FWI 1987](docs/fire-weather-index.md)
 - [Validación LIVE Fase 5](docs/risk-live-validation.md)
 - [Model card risk-baseline-v1](docs/models/risk-baseline-v1.md)
+- [Corpus histórico](docs/historical-fire-corpus.md)
+- [Selección reproducible del corpus](docs/historical-corpus-selection.md)
+- [Replay Engine](docs/replay-engine.md)
+- [Prevención de leakage](docs/replay-data-leakage.md)
+- [Validación LIVE Fase 6](docs/replay-live-validation.md)

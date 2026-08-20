@@ -26,8 +26,16 @@ Los productos invalidados se conservan para auditoría. La futura reconstrucció
 supersesiones deberá considerar su intervalo `[published_at, invalidated_at)`; la API pública 4B
 sirve el catálogo vigente y aplica estrictamente los dos límites temporales anteriores.
 
+Fase 6 extiende este contrato a observaciones, meteorología e incidentes. El detalle técnico,
+aislamiento y threat model están en `replay-engine.md` y `replay-data-leakage.md`. La pantalla
+`/replay` mantiene una banda permanente, controles play/pausa/paso/velocidad y dos planos rotulados:
+“LO QUE VIGÍA SABÍA” y, solo al activar comparación, “LO QUE SABEMOS AHORA”.
+
 ## Riesgo y forecast
 
 `ANALYSIS` solo admite entradas observadas/procesadas hasta `as_of`. `FORECAST` exige
 además `issued_at <= as_of`; `valid_at` puede ser posterior. Los tests rechazan cualquier
 componente futura. Igual AOI, tiempos, hashes y configuración generan la misma clave.
+
+El histórico AEMET diario inspeccionado no ofrece por sí solo las observaciones de mediodía local
+que requiere FWI. En ese caso Replay muestra `UNAVAILABLE`; no inventa hora ni inicialización.

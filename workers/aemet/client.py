@@ -1,7 +1,7 @@
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
@@ -63,11 +63,82 @@ class AemetHourlyForecast:
     quality: dict[str, Any]
 
 
+@dataclass(frozen=True, slots=True)
+class AemetDailyClimate:
+    station_code: str
+    station_name: str
+    province: str
+    calendar_date: date
+    temperature_mean_c: float | None
+    temperature_min_c: float | None
+    temperature_max_c: float | None
+    relative_humidity_mean_pct: float | None
+    wind_speed_mean_ms: float | None
+    gust_ms: float | None
+    precipitation_24h_mm: float | None
+    quality: dict[str, Any]
+    raw_properties: dict[str, Any]
+
+
 def _number(row: dict[str, Any], key: str) -> float | None:
     value = row.get(key)
     if value is None or value == "":
         return None
     return float(value)
+
+
+def _locale_number(row: dict[str, Any], key: str) -> float | None:
+    value = row.get(key)
+    if value is None or value == "":
+        return None
+    try:
+        return float(str(value).replace(",", "."))
+    except ValueError:
+        return None
+
+
+def parse_aemet_daily_climate(payload: object) -> list[AemetDailyClimate]:
+    if not isinstance(payload, list):
+        raise AemetPayloadError("La climatología diaria AEMET no es una lista.")
+    output: list[AemetDailyClimate] = []
+    for index, item in enumerate(payload):
+        if not isinstance(item, dict):
+            raise AemetPayloadError(f"Registro climatológico inválido en {index}.")
+        row = {str(key): value for key, value in item.items()}
+        try:
+            calendar_date = date.fromisoformat(str(row["fecha"]))
+            station_code = str(row["indicativo"]).strip()
+            station_name = str(row["nombre"]).strip()
+            province = str(row["provincia"]).strip()
+            if not station_code:
+                raise ValueError("indicativo vacío")
+        except (KeyError, ValueError) as exc:
+            raise AemetPayloadError(f"Registro climatológico inválido en {index}.") from exc
+        output.append(
+            AemetDailyClimate(
+                station_code=station_code,
+                station_name=station_name,
+                province=province,
+                calendar_date=calendar_date,
+                temperature_mean_c=_locale_number(row, "tmed"),
+                temperature_min_c=_locale_number(row, "tmin"),
+                temperature_max_c=_locale_number(row, "tmax"),
+                relative_humidity_mean_pct=_locale_number(row, "hrMedia"),
+                wind_speed_mean_ms=_locale_number(row, "velmedia"),
+                gust_ms=_locale_number(row, "racha"),
+                precipitation_24h_mm=_locale_number(row, "prec"),
+                quality={
+                    "temporal_precision": "DATE_ONLY",
+                    "fwi_compatible": False,
+                    "fwi_reason": "DAILY_MEANS_DO_NOT_REPLACE_NOON_LOCAL_STANDARD_OBSERVATIONS",
+                    "precipitation_trace_raw": row.get("prec")
+                    if _locale_number(row, "prec") is None
+                    else None,
+                },
+                raw_properties=row,
+            )
+        )
+    return output
 
 
 def _timestamp(value: object) -> datetime:
@@ -366,3 +437,51 @@ class AemetClient:
             latitude=latitude,
             longitude=longitude,
         )
+
+    async def fetch_daily_climate(
+        self, *, start_date: date, end_date: date
+    ) -> list[AemetDailyClimate]:
+        if end_date < start_date or (end_date - start_date).days > 31:
+            raise ValueError("La ventana climatológica debe estar entre 1 y 32 días.")
+        start = f"{start_date.isoformat()}T00:00:00UTC"
+        end = f"{end_date.isoformat()}T23:59:59UTC"
+        url = (
+            "https://opendata.aemet.es/opendata/api/valores/climatologicos/diarios/datos/"
+            f"fechaini/{start}/fechafin/{end}/todasestaciones"
+        )
+        try:
+            async with httpx.AsyncClient(
+                timeout=max(self._timeout, 90),
+                transport=self._transport,
+                follow_redirects=False,
+            ) as client:
+                locator = await client.get(
+                    url,
+                    params={"api_key": self._api_key},
+                    headers={"Accept": "application/json"},
+                )
+                if not 200 <= locator.status_code < 300:
+                    raise AemetHTTPError(f"AEMET respondió con HTTP {locator.status_code}.")
+                envelope = locator.json()
+                if not isinstance(envelope, dict) or not isinstance(envelope.get("datos"), str):
+                    raise AemetPayloadError("AEMET no devolvió una URL climatológica válida.")
+                data_url = envelope["datos"]
+                if urlparse(data_url).hostname != "opendata.aemet.es":
+                    raise AemetPayloadError("AEMET devolvió una URL de datos no autorizada.")
+                response = await client.get(data_url, headers={"Accept": "application/json"})
+                if not 200 <= response.status_code < 300:
+                    raise AemetHTTPError(
+                        f"AEMET climatología respondió con HTTP {response.status_code}."
+                    )
+        except httpx.TimeoutException as exc:
+            raise AemetTimeoutError("AEMET no respondió dentro del tiempo límite.") from exc
+        try:
+            payload = response.json()
+        except ValueError:
+            try:
+                payload = json.loads(response.content.decode("iso-8859-1"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as fallback_exc:
+                raise AemetPayloadError(
+                    "AEMET climatología no devolvió JSON válido."
+                ) from fallback_exc
+        return parse_aemet_daily_climate(payload)

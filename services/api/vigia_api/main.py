@@ -1,8 +1,9 @@
 import json
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from time import perf_counter
 from typing import Any, cast
 from uuid import UUID, uuid4
 
@@ -10,6 +11,12 @@ import structlog
 from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
+from vigia_ai.fusion.config import load_fusion_config
+from vigia_ai.replay.clock import ReplayClock
+from vigia_ai.replay.context import ReplayDataContext
+from vigia_ai.replay.engine import ReplayEngine
+from vigia_ai.replay.models import ReplayCaseManifest, ReplayInput
+from vigia_ai.replay.repository import ReplayRepository
 from vigia_geospatial.aoi import AOIRequest, resolve_inline_aoi
 from vigia_geospatial.serving import render_tile, sample_raster
 
@@ -33,6 +40,9 @@ from .models import (
     IncidentFeature,
     IncidentHistoryEntry,
     IncidentProperties,
+    ReplayCaseSummary,
+    ReplayRunRequest,
+    ReplayRunResponse,
     RiskAssessmentResponse,
     RiskContextResponse,
     RiskForecastResponse,
@@ -74,7 +84,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ALLOWED_ORIGINS,
     allow_credentials=False,
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["Accept", "Content-Type", "X-Request-ID"],
 )
 
@@ -790,3 +800,149 @@ async def risk_layers() -> list[dict[str, Any]]:
         return await _require_database().risk_layers()
     except DatabaseUnavailableError as exc:
         raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc
+
+
+@app.get("/api/replay/cases", response_model=list[ReplayCaseSummary], tags=["replay"])
+async def replay_cases(limit: int = Query(default=100, ge=1, le=500)) -> list[ReplayCaseSummary]:
+    try:
+        rows = await _require_database().replay_cases(limit=limit)
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc
+    return [ReplayCaseSummary(**row) for row in rows]
+
+
+@app.get("/api/replay/cases/{case_id}", response_model=dict[str, Any], tags=["replay"])
+async def replay_case(case_id: str) -> dict[str, Any]:
+    try:
+        row = await _require_database().replay_case(case_id)
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc
+    if row is None:
+        raise HTTPException(status_code=404, detail="ReplayCase NO DISPONIBLE")
+    return row
+
+
+@app.post("/api/replay/runs", response_model=ReplayRunResponse, tags=["replay"])
+async def create_replay_run(request: ReplayRunRequest) -> ReplayRunResponse:
+    active_database = _require_database()
+    try:
+        case_row = await active_database.replay_case(request.case_id)
+        input_rows = await active_database.replay_inputs(request.case_id)
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc
+    if case_row is None:
+        raise HTTPException(status_code=404, detail="ReplayCase NO DISPONIBLE")
+    manifest = ReplayCaseManifest.model_validate(case_row["manifest"])
+    inputs = tuple(ReplayInput.model_validate(row) for row in input_rows)
+    config = load_fusion_config()
+    engine = ReplayEngine(
+        data_context=ReplayDataContext(inputs),
+        clock=ReplayClock(
+            start=manifest.replay_start,
+            end=manifest.replay_end,
+            step=timedelta(minutes=manifest.time_step_minutes),
+        ),
+        fusion_config=config,
+    )
+    started_at = datetime.now(UTC)
+    monotonic = perf_counter()
+    result = engine.run(manifest, code_commit=settings.VIGIA_CODE_COMMIT)
+    elapsed_ms = round((perf_counter() - monotonic) * 1000)
+    try:
+        run_id = await ReplayRepository(active_database).persist_run(
+            result,
+            configuration=config.model_dump(mode="json"),
+            started_at=started_at,
+            elapsed_ms=elapsed_ms,
+            approximate_peak_memory_bytes=None,
+        )
+        row = await active_database.replay_run(str(run_id))
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc
+    if row is None:
+        raise HTTPException(status_code=500, detail="ReplayRun no persistido")
+    return ReplayRunResponse(**row)
+
+
+@app.get("/api/replay/runs/{run_id}", response_model=ReplayRunResponse, tags=["replay"])
+async def replay_run(run_id: str) -> ReplayRunResponse:
+    try:
+        row = await _require_database().replay_run(run_id)
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc
+    if row is None:
+        raise HTTPException(status_code=404, detail="ReplayRun NO DISPONIBLE")
+    return ReplayRunResponse(**row)
+
+
+@app.get(
+    "/api/replay/runs/{run_id}/timeline",
+    response_model=list[dict[str, Any]],
+    tags=["replay"],
+)
+async def replay_timeline(run_id: str) -> list[dict[str, Any]]:
+    try:
+        return await _require_database().replay_timeline(run_id)
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc
+
+
+@app.get(
+    "/api/replay/runs/{run_id}/incidents",
+    response_model=list[dict[str, Any]],
+    tags=["replay"],
+)
+async def replay_incidents(run_id: str) -> list[dict[str, Any]]:
+    try:
+        return await _require_database().replay_incidents(run_id)
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc
+
+
+@app.get("/api/replay/runs/{run_id}/observations", response_model=dict[str, Any], tags=["replay"])
+async def replay_observations(
+    run_id: str,
+    as_of: datetime,
+    limit: int = Query(default=5000, ge=1, le=5000),
+) -> dict[str, Any]:
+    try:
+        rows = await _require_database().replay_observations(
+            run_id, as_of=as_of, limit=limit
+        )
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc
+    return {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [row["longitude"], row["latitude"]],
+                },
+                "properties": {
+                    key: row[key]
+                    for key in (
+                        "id",
+                        "source",
+                        "observed_at",
+                        "available_at",
+                        "platform",
+                        "sensor",
+                        "confidence_raw",
+                        "frp_mw",
+                        "availability_basis",
+                        "quality_flags",
+                    )
+                },
+            }
+            for row in rows
+        ],
+        "as_of": as_of,
+        "count": len(rows),
+        "message": (
+            "Observaciones históricas disponibles en el corte; no son incendios."
+            if rows
+            else "SIN DATOS en el corte temporal solicitado."
+        ),
+    }

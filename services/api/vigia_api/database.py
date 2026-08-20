@@ -567,6 +567,215 @@ class VigiaDatabase:
             "No se pudieron consultar las capas de riesgo.",
         )
 
+    async def replay_cases(self, *, limit: int = 100) -> list[dict[str, Any]]:
+        return await self._mapped_query(
+            text(
+                """
+                select case_row.id::text, case_row.case_key, case_row.kind::text,
+                  case_row.replay_start, case_row.replay_end, case_row.time_step_minutes,
+                  case_row.case_version, case_row.reference_quality::text,
+                  case_row.available_sources, case_row.reference_sources,
+                  case_row.sensor_availability, case_row.manifest_hash,
+                  fire.vigia_code as historical_event_code, fire.name,
+                  fire.region, fire.provinces, fire.municipality,
+                  fire.started_at as official_start_time,
+                  extensions.st_x(fire.origin::extensions.geometry) as reference_longitude,
+                  extensions.st_y(fire.origin::extensions.geometry) as reference_latitude,
+                  count(input.id)::integer as input_count
+                from vigia.replay_cases case_row
+                left join vigia.historical_fires fire on fire.id = case_row.historical_fire_id
+                left join vigia.replay_inputs input on input.case_id = case_row.id
+                group by case_row.id, fire.id
+                order by case_row.replay_start desc, case_row.case_key
+                limit :limit
+                """
+            ),
+            {"limit": limit},
+            "No se pudieron consultar los casos replay.",
+        )
+
+    async def replay_case(self, case_id: str) -> dict[str, Any] | None:
+        statement = text(
+            """
+            select case_row.id::text, case_row.case_key, case_row.kind::text,
+              case_row.replay_start, case_row.replay_end, case_row.time_step_minutes,
+              case_row.manifest, case_row.manifest_hash, case_row.case_version,
+              case_row.selection_policy_version, case_row.available_sources,
+              case_row.reference_sources, case_row.sensor_availability,
+              case_row.reference_quality::text, case_row.frozen,
+              extensions.st_asgeojson(case_row.aoi)::jsonb as aoi,
+              fire.event_key as historical_fire_event_id,
+              fire.vigia_code as historical_event_code, fire.name,
+              fire.region, fire.provinces, fire.municipality,
+              fire.started_at as official_start_time,
+              extensions.st_x(fire.origin::extensions.geometry) as reference_longitude,
+              extensions.st_y(fire.origin::extensions.geometry) as reference_latitude,
+              coalesce((
+                select jsonb_agg(jsonb_build_object(
+                  'meaning', timestamp_row.meaning,
+                  'instant', timestamp_row.instant,
+                  'calendar_date', timestamp_row.calendar_date,
+                  'precision', timestamp_row.precision::text,
+                  'timezone', timestamp_row.timezone_name
+                ) order by timestamp_row.meaning, timestamp_row.instant)
+                from vigia.historical_fire_references reference
+                join vigia.historical_fire_timestamps timestamp_row
+                  on timestamp_row.reference_id = reference.id
+                where reference.historical_fire_id = fire.id
+              ), '[]'::jsonb) as reference_timestamps,
+              coalesce((
+                select jsonb_agg(jsonb_build_object(
+                  'source', source.name,
+                  'provider', source.provider,
+                  'retrieved_at', reference.retrieved_at,
+                  'quality', reference.reference_quality::text,
+                  'source_uri', reference.source_uri,
+                  'license_uri', reference.license_uri
+                ) order by reference.retrieved_at, reference.id)
+                from vigia.historical_fire_references reference
+                join vigia.sources source on source.id = reference.source_id
+                where reference.historical_fire_id = fire.id
+              ), '[]'::jsonb) as references,
+              coalesce((
+                select jsonb_agg(jsonb_build_object(
+                  'external_id', perimeter.external_id,
+                  'reference_at', perimeter.reference_at,
+                  'reference_date', perimeter.reference_date,
+                  'precision', perimeter.temporal_precision::text,
+                  'area_ha', perimeter.area_ha,
+                  'geometry', extensions.st_asgeojson(perimeter.geometry)::jsonb
+                ) order by perimeter.reference_at nulls last, perimeter.id)
+                from vigia.historical_fire_perimeters perimeter
+                where perimeter.historical_fire_id = fire.id
+              ), '[]'::jsonb) as reference_perimeters
+            from vigia.replay_cases case_row
+            left join vigia.historical_fires fire on fire.id = case_row.historical_fire_id
+            where case_row.id::text = :case_id or case_row.case_key = :case_id
+            limit 1
+            """
+        )
+        try:
+            async with self._engine.connect() as connection:
+                row = (
+                    (await connection.execute(statement, {"case_id": case_id}))
+                    .mappings()
+                    .one_or_none()
+                )
+        except (SQLAlchemyError, OSError) as exc:
+            raise DatabaseUnavailableError("No se pudo consultar el caso replay.") from exc
+        return dict(row) if row is not None else None
+
+    async def replay_inputs(self, case_id: str) -> list[dict[str, Any]]:
+        return await self._mapped_query(
+            text(
+                """
+                select input.input_key as input_id, input.kind::text as kind,
+                  input.source_code as source, input.observed_at, input.available_at,
+                  extensions.st_x(input.location::extensions.geometry) as longitude,
+                  extensions.st_y(input.location::extensions.geometry) as latitude,
+                  input.payload, input.provenance, input.availability_basis,
+                  input.quality_flags
+                from vigia.replay_inputs input
+                join vigia.replay_cases case_row on case_row.id = input.case_id
+                where case_row.id::text = :case_id or case_row.case_key = :case_id
+                order by input.observed_at, input.input_key
+                """
+            ),
+            {"case_id": case_id},
+            "No se pudieron consultar los inputs replay.",
+        )
+
+    async def replay_run(self, run_id: str) -> dict[str, Any] | None:
+        statement = text(
+            """
+            select run.id::text, run.run_hash, run.state::text, run.code_commit,
+              run.engine_versions, run.configuration_hash, run.case_manifest_hash,
+              run.started_at, run.completed_at, run.step_count, run.completed_step,
+              run.observations_processed, run.wall_time_ms,
+              run.approximate_peak_memory_bytes, run.deterministic,
+              run.live_state_mutated, run.errors,
+              case_row.id::text as case_id, case_row.case_key
+            from vigia.replay_runs run
+            join vigia.replay_cases case_row on case_row.id = run.case_id
+            where run.id::text = :run_id or run.run_hash = :run_id
+            limit 1
+            """
+        )
+        try:
+            async with self._engine.connect() as connection:
+                row = (
+                    (await connection.execute(statement, {"run_id": run_id}))
+                    .mappings()
+                    .one_or_none()
+                )
+        except (SQLAlchemyError, OSError) as exc:
+            raise DatabaseUnavailableError("No se pudo consultar ReplayRun.") from exc
+        return dict(row) if row is not None else None
+
+    async def replay_timeline(self, run_id: str) -> list[dict[str, Any]]:
+        return await self._mapped_query(
+            text(
+                """
+                select step.step_index, step.as_of, step.visible_input_count,
+                  step.visible_observation_count, step.candidate_count,
+                  step.incidents, step.risk, step.availability,
+                  step.exclusion_counts, step.output_hash
+                from vigia.replay_steps step
+                join vigia.replay_runs run on run.id = step.replay_run_id
+                where run.id::text = :run_id or run.run_hash = :run_id
+                order by step.step_index
+                """
+            ),
+            {"run_id": run_id},
+            "No se pudo consultar la timeline replay.",
+        )
+
+    async def replay_incidents(self, run_id: str) -> list[dict[str, Any]]:
+        return await self._mapped_query(
+            text(
+                """
+                select step.step_index, step.as_of, incident.value as incident
+                from vigia.replay_steps step
+                join vigia.replay_runs run on run.id = step.replay_run_id
+                cross join lateral jsonb_array_elements(step.incidents) incident(value)
+                where run.id::text = :run_id or run.run_hash = :run_id
+                order by step.step_index, incident.value->>'replay_incident_id'
+                """
+            ),
+            {"run_id": run_id},
+            "No se pudieron consultar los incidentes replay.",
+        )
+
+    async def replay_observations(
+        self, run_id: str, *, as_of: datetime, limit: int
+    ) -> list[dict[str, Any]]:
+        return await self._mapped_query(
+            text(
+                """
+                select input.input_key as id, input.source_code as source,
+                  input.observed_at, input.available_at,
+                  extensions.st_x(input.location::extensions.geometry) as longitude,
+                  extensions.st_y(input.location::extensions.geometry) as latitude,
+                  input.payload->>'platform' as platform,
+                  input.payload->>'sensor' as sensor,
+                  input.payload->>'confidence_raw' as confidence_raw,
+                  input.payload->'frp_mw' as frp_mw,
+                  input.availability_basis, input.quality_flags
+                from vigia.replay_inputs input
+                join vigia.replay_runs run on run.case_id = input.case_id
+                where (run.id::text = :run_id or run.run_hash = :run_id)
+                  and input.kind = 'THERMAL_OBSERVATION'
+                  and input.observed_at <= :as_of
+                  and input.available_at <= :as_of
+                  and input.location is not null
+                order by input.observed_at, input.input_key
+                limit :limit
+                """
+            ),
+            {"run_id": run_id, "as_of": as_of, "limit": limit},
+            "No se pudieron consultar las observaciones Replay.",
+        )
+
     async def _mapped_query(
         self, statement: Any, parameters: dict[str, Any], safe_error: str
     ) -> list[dict[str, Any]]:

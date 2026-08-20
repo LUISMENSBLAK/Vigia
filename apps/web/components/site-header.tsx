@@ -5,6 +5,7 @@ import { VigiaLogo } from "./vigia-logo";
 const links = [
   ["Mapa", "/mapa"],
   ["Riesgo", "/riesgo"],
+  ["Replay", "/replay"],
   ["Validación", "/validacion"],
   ["Metodología", "/metodologia"],
   ["Estado", "/estado"],

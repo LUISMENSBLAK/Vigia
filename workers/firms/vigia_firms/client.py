@@ -15,6 +15,13 @@ class FirmsSource(StrEnum):
     VIIRS_NOAA21_NRT = "VIIRS_NOAA21_NRT"
     VIIRS_SNPP_NRT = "VIIRS_SNPP_NRT"
     MODIS_NRT = "MODIS_NRT"
+    VIIRS_NOAA20_SP = "VIIRS_NOAA20_SP"
+    VIIRS_SNPP_SP = "VIIRS_SNPP_SP"
+    MODIS_SP = "MODIS_SP"
+
+    @property
+    def is_standard_processing(self) -> bool:
+        return self.value.endswith("_SP")
 
     @property
     def catalogue_code(self) -> str:
@@ -159,6 +166,7 @@ class FirmsClient:
         bbox: tuple[float, float, float, float] = (-9.5, 35.7, 4.6, 43.9),
         day_range: int = 1,
         end_date: date | None = None,
+        received_at: datetime | None = None,
     ) -> list[FirmsObservation]:
         if day_range not in range(1, 6):
             raise ValueError("day_range debe estar entre 1 y 5.")
@@ -189,7 +197,11 @@ class FirmsClient:
             raise FirmsQuotaError("NASA FIRMS indicó que la cuota está agotada.")
         if "invalid map_key" in normalized or "invalid map key" in normalized:
             raise FirmsHTTPError("NASA FIRMS rechazó NASA_FIRMS_MAP_KEY.")
-        return parse_firms_csv(response.text, source, received_at=datetime.now(UTC))
+        return parse_firms_csv(
+            response.text,
+            source,
+            received_at=(received_at or datetime.now(UTC)),
+        )
 
 
 def raw_input_hash(observation: FirmsObservation) -> str:

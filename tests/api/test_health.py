@@ -466,3 +466,89 @@ async def test_risk_forecast_returns_unavailable_without_real_horizons(
     assert payload["availability"] == "UNAVAILABLE"
     assert payload["forecasts"] == []
     assert payload["message"].startswith("NO DISPONIBLE")
+
+
+class ReplayDatabase(FakeDatabase):
+    async def replay_cases(self, *, limit: int) -> list[dict[str, object]]:
+        assert limit == 100
+        return [{
+            "id": "case-id",
+            "case_key": "real-case-key",
+            "kind": "POSITIVE_REFERENCE",
+            "replay_start": datetime(2025, 8, 16, 12, tzinfo=UTC),
+            "replay_end": datetime(2025, 8, 17, 12, tzinfo=UTC),
+            "time_step_minutes": 10,
+            "case_version": "pilot-v1",
+            "reference_quality": "HIGH",
+            "available_sources": ["NASA_FIRMS_VIIRS_NOAA20_SP"],
+            "reference_sources": ["Junta de Castilla y León"],
+            "sensor_availability": {"VIIRS_NOAA20_SP": "AVAILABLE"},
+            "manifest_hash": "a" * 64,
+            "historical_event_code": "VIGIA-HIST-REAL",
+            "name": "Referencia oficial",
+            "region": "Castilla y León",
+            "provinces": ["LEÓN"],
+            "municipality": "Municipio oficial",
+            "official_start_time": datetime(2025, 8, 16, 14, 20, tzinfo=UTC),
+            "reference_longitude": -5.0,
+            "reference_latitude": 42.6,
+            "input_count": 3,
+        }]
+
+    async def replay_timeline(self, run_id: str) -> list[dict[str, object]]:
+        assert run_id == "run-id"
+        return [{
+            "step_index": 0,
+            "as_of": datetime(2025, 8, 16, 12, tzinfo=UTC),
+            "visible_input_count": 0,
+            "visible_observation_count": 0,
+            "candidate_count": 0,
+            "incidents": [],
+            "risk": {"availability": "UNAVAILABLE"},
+            "availability": {},
+            "exclusion_counts": {"FUTURE_OBSERVATION": 3},
+            "output_hash": "b" * 64,
+        }]
+
+    async def replay_observations(
+        self, run_id: str, *, as_of: datetime, limit: int
+    ) -> list[dict[str, object]]:
+        assert run_id == "run-id"
+        assert as_of == datetime(2025, 8, 16, 12, tzinfo=UTC)
+        assert limit == 5000
+        return [{
+            "id": "historical-observation",
+            "source": "NASA_FIRMS_VIIRS_NOAA20_SP",
+            "observed_at": as_of,
+            "available_at": as_of,
+            "longitude": -5.0,
+            "latitude": 42.6,
+            "platform": "NOAA-20",
+            "sensor": "VIIRS",
+            "confidence_raw": "n",
+            "frp_mw": 4.2,
+            "availability_basis": "OBSERVATION_TIME_PROXY",
+            "quality_flags": ["NO_LATENCY_CLAIMS_ALLOWED"],
+        }]
+
+
+async def test_replay_api_exposes_reference_and_engine_timeline_separately(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(main, "database", ReplayDatabase())
+    cases = (await request("/api/replay/cases")).json()
+    timeline = (await request("/api/replay/runs/run-id/timeline")).json()
+    observations = (
+        await request(
+            "/api/replay/runs/run-id/observations?as_of=2025-08-16T12:00:00Z"
+        )
+    ).json()
+    assert cases[0]["historical_event_code"] == "VIGIA-HIST-REAL"
+    assert timeline[0]["incidents"] == []
+    assert timeline[0]["exclusion_counts"] == {"FUTURE_OBSERVATION": 3}
+    assert "official_start_time" not in timeline[0]
+    assert observations["features"][0]["geometry"]["coordinates"] == [-5.0, 42.6]
+    assert observations["features"][0]["properties"]["availability_basis"] == (
+        "OBSERVATION_TIME_PROXY"
+    )
+    assert "official_start_time" not in observations["features"][0]["properties"]

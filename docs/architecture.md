@@ -57,3 +57,10 @@ cobertura aceptan `as_of` y excluyen adquisiciones o procesamientos futuros. Ver
 `as_of`, horizonte, configuración y snapshot; `risk_predictions` conserva índice
 experimental, componentes, faltantes, explicación y COG asociado. Los hotspots nunca
 son entrada causal del motor de riesgo.
+
+## Fase 6: corpus histórico y Replay
+
+`vigia_ai.historical` normaliza referencias oficiales versionadas. `vigia_ai.replay` ejecuta el
+mismo Fusion/Detection/Risk con `ReplayClock` y un contexto cortado por `as_of`. Ground truth vive
+en tablas/contextos separados y solo participa en evaluación posterior. Las tablas `replay_*` son
+privadas, idempotentes, con RLS forzado y no mutan el estado LIVE. Ver `replay-engine.md`.

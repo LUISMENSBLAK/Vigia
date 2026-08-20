@@ -229,6 +229,56 @@ class RiskForecastResponse(BaseModel):
     message: str
 
 
+class ReplayCaseSummary(BaseModel):
+    id: str
+    case_key: str
+    kind: str
+    replay_start: datetime
+    replay_end: datetime
+    time_step_minutes: int = Field(gt=0)
+    case_version: str
+    reference_quality: str
+    available_sources: list[str]
+    reference_sources: list[str]
+    sensor_availability: dict[str, str]
+    manifest_hash: str
+    historical_event_code: str | None = None
+    name: str | None = None
+    region: str | None = None
+    provinces: list[str] = Field(default_factory=list)
+    municipality: str | None = None
+    official_start_time: datetime | None = None
+    reference_longitude: float | None = None
+    reference_latitude: float | None = None
+    input_count: int = Field(ge=0)
+
+
+class ReplayRunRequest(BaseModel):
+    case_id: str
+
+
+class ReplayRunResponse(BaseModel):
+    id: str
+    run_hash: str
+    state: str
+    code_commit: str
+    engine_versions: dict[str, Any]
+    configuration_hash: str
+    case_manifest_hash: str
+    started_at: datetime
+    completed_at: datetime | None = None
+    step_count: int = Field(ge=0)
+    completed_step: int = Field(ge=-1)
+    observations_processed: int = Field(ge=0)
+    wall_time_ms: int | None = Field(default=None, ge=0)
+    approximate_peak_memory_bytes: int | None = Field(default=None, ge=0)
+    deterministic: bool
+    live_state_mutated: Literal[False]
+    errors: list[dict[str, Any]]
+    case_id: str
+    case_key: str
+
+
 def current_status(
     *,
     live_enabled: bool,

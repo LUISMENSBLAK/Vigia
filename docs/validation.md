@@ -39,3 +39,17 @@ En la validación final del `2026-08-20`: TypeScript, ESLint, Vitest (`12/12`), 
 Ruff, mypy y Pytest (`104/104`) terminaron correctamente. Playwright quedó `BLOCKED`: Chromium
 estaba instalado, pero el sandbox del entorno denegó el registro del puerto Mach necesario para
 arrancarlo. No se clasifica como fallo funcional de VIGÍA.
+
+## Puertas de Fase 6
+
+La suite añade ingestión/identidad/deduplicación histórica, precisión temporal, manifest y reloj,
+clock injection, `as_of`, truth firewall, leakage térmico/weather/Sentinel/perímetro, warm-up FWI,
+aislamiento LIVE, confirmación automática bloqueada, determinismo, contratos SQL/RLS, API/timeline
+y presentación textual. El primer replay real debe informar su muestra y límites; un caso no valida
+precisión, recall, latencia ni cobertura nacional.
+
+Validación final Fase 6 del `2026-08-20`: TypeScript, ESLint, Vitest (`15/15`), build Next.js,
+Ruff, mypy (`69` módulos) y Pytest (`128/128`) terminaron GREEN. La cadena completa de migraciones
+se ejecutó desde cero en PostgreSQL 17/PostGIS 3.5 desechable; la mutación de un manifest congelado
+fue rechazada por trigger. Playwright se intentó con dos casos, pero Chromium no pudo registrar
+`MachPortRendezvousServer` por el sandbox (`Permission denied 1100`): `BLOCKED`, no fallo funcional.

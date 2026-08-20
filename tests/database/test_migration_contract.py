@@ -5,6 +5,10 @@ PHASE3_MIGRATION = Path("database/migrations/20260820000000_phase3_fusion.sql")
 PHASE4_MIGRATION = Path("database/migrations/20260820010000_phase4_geospatial.sql")
 PHASE4B_MIGRATION = Path("database/migrations/20260820020000_phase4b_real_geospatial.sql")
 PHASE5_MIGRATION = Path("database/migrations/20260820030000_phase5_national_risk.sql")
+PHASE6_MIGRATION = Path("database/migrations/20260820040000_phase6_historical_replay.sql")
+PHASE6_HARDENING = Path(
+    "database/migrations/20260820040100_phase6_replay_immutability.sql"
+)
 
 
 def migration_sql() -> str:
@@ -25,6 +29,14 @@ def phase4b_sql() -> str:
 
 def phase5_sql() -> str:
     return PHASE5_MIGRATION.read_text(encoding="utf-8").casefold()
+
+
+def phase6_sql() -> str:
+    return PHASE6_MIGRATION.read_text(encoding="utf-8").casefold()
+
+
+def phase6_hardening_sql() -> str:
+    return PHASE6_HARDENING.read_text(encoding="utf-8").casefold()
 
 
 def test_migration_keeps_private_and_api_schemas() -> None:
@@ -202,3 +214,51 @@ def test_phase5_risk_contract_is_non_probabilistic_and_temporal() -> None:
     assert "input_snapshot_hash" in sql
     assert "force row level security" in sql
     assert "risk_score double precision not null" not in sql
+
+
+def test_phase6_separates_reference_truth_from_replay_inputs() -> None:
+    sql = phase6_sql()
+    assert "create table vigia.historical_fire_references" in sql
+    assert "create table vigia.historical_fire_perimeters" in sql
+    assert "create table vigia.replay_inputs" in sql
+    replay_inputs = sql.split("create table vigia.replay_inputs", 1)[1].split(
+        "create table vigia.replay_runs", 1
+    )[0]
+    assert "historical_fire_id" not in replay_inputs
+    assert "perimeter" not in replay_inputs
+    assert "available_at >= observed_at" in replay_inputs
+    assert "historical_fire_perimeters_geometry_gist" in sql
+    assert "provenance jsonb not null" in sql
+
+
+def test_phase6_replay_runs_are_isolated_idempotent_and_reproducible() -> None:
+    sql = phase6_sql()
+    assert "run_hash text not null unique" in sql
+    assert "code_commit text not null" in sql
+    assert "case_manifest_hash" in sql
+    assert "input_snapshot_hash" in sql
+    assert "live_state_mutated boolean not null default false" in sql
+    assert "check (live_state_mutated = false)" in sql
+
+
+def test_phase6_private_tables_force_rls() -> None:
+    sql = phase6_sql()
+    for table in (
+        "historical_fire_references",
+        "historical_fire_timestamps",
+        "historical_fire_perimeters",
+        "replay_cases",
+        "replay_inputs",
+        "replay_runs",
+        "replay_steps",
+    ):
+        assert f"alter table vigia.{table} enable row level security" in sql
+        assert f"alter table vigia.{table} force row level security" in sql
+
+
+def test_phase6_frozen_manifest_is_database_enforced() -> None:
+    sql = phase6_hardening_sql()
+    assert "prevent_frozen_replay_case_update" in sql
+    assert "replay_cases_immutable_when_frozen" in sql
+    assert "to_jsonb(new) - 'updated_at'" in sql
+    assert "update vigia.replay_cases set frozen = true" in sql

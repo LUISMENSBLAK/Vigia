@@ -44,3 +44,14 @@ filtra tanto adquisición como procesamiento para impedir future leakage.
 Cada run conserva fuente/producto, hashes, versión, configuración, software/commit,
 fecha, CRS, resolución, algoritmo, AOI y output hash. El snapshot excluye secretos. Las
 razones y faltantes se persisten con la salida.
+
+## Corpus histórico y Replay
+
+Cada referencia histórica conserva registro original, checksum, URI, licencia, fecha de descarga,
+calidad y timestamps semánticos. Cada perímetro conserva versión temporal, geometría, CRS,
+resolución y método. El evento canónico nunca elimina referencias anteriores.
+
+Cada `ReplayCase` conserva manifest/hash, AOI, ventana, disponibilidad de sensores, fuentes de
+input y de referencia. Cada `ReplayRun` conserva commit, versiones de motores, configuración/hash,
+snapshot hash, steps, progreso, duración y memoria aproximada cuando es medible. Los inputs FIRMS
+con disponibilidad no reconstruible están marcados como proxy y prohíben claims de latencia.

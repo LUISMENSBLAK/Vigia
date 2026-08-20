@@ -36,3 +36,10 @@ recibe un `EvidenceBundle`, continúa en research y obliga `calibrated_probabili
 No usa ML. El FWI procede de ecuaciones publicadas y la composición es una regla
 determinista, no calibrada y experimental. No se declara probabilidad, precisión ni
 confianza estadística. Véanse `risk-engine.md` y la model card.
+
+## Evaluación histórica
+
+Replay no entrena ni modifica los motores. El evento oficial se oculta durante la ejecución y el
+matching espacio-temporal ocurre después, en un módulo de evaluación separado. La política del
+corpus se congela antes de ver resultados. No hay métricas científicas de Fase 6 mientras no existan
+positivos y controles representativos, splits inmutables y timestamps de disponibilidad defendibles.

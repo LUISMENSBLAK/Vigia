@@ -49,6 +49,8 @@ packages = [
   "vigia_ai.confidence",
   "vigia_ai.fusion",
   "vigia_ai.detection",
+  "vigia_ai.historical",
+  "vigia_ai.replay",
   "vigia_ai.risk",
   "vigia_geospatial",
   "workers.aemet",

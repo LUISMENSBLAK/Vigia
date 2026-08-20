@@ -1,0 +1,37 @@
+{
+  "version": "sensor-availability-v1",
+  "verified_at": "2026-08-20T00:00:00Z",
+  "sensors": {
+    "MODIS_SP": {
+      "available_from": "2000-11-01T00:00:00Z",
+      "source": "NASA FIRMS data availability API",
+      "source_url": "https://firms.modaps.eosdis.nasa.gov/api/data_availability/"
+    },
+    "VIIRS_SNPP_SP": {
+      "available_from": "2012-01-20T00:00:00Z",
+      "source": "NASA FIRMS data availability API",
+      "source_url": "https://firms.modaps.eosdis.nasa.gov/api/data_availability/"
+    },
+    "VIIRS_NOAA20_SP": {
+      "available_from": "2018-04-01T00:00:00Z",
+      "source": "NASA FIRMS data availability API",
+      "source_url": "https://firms.modaps.eosdis.nasa.gov/api/data_availability/"
+    },
+    "VIIRS_NOAA21_NRT": {
+      "available_from": "2024-01-17T00:00:00Z",
+      "source": "NASA FIRMS data availability API",
+      "source_url": "https://firms.modaps.eosdis.nasa.gov/api/data_availability/",
+      "historical_policy": "NRT_NOT_USED_FOR_LONG_TERM_CORPUS"
+    },
+    "MTG_FCI_L1C_PREOPERATIONAL": {
+      "available_from": "2024-09-24T00:00:00Z",
+      "source": "EUMETSAT public release notice",
+      "source_url": "https://user.eumetsat.int/news-events/news/public-release-of-pre-operational-mtg-i1-fci-data"
+    },
+    "MTG_FCI_L1C_OPERATIONAL": {
+      "available_from": "2024-12-04T10:00:00Z",
+      "source": "EUMETSAT operational declaration",
+      "source_url": "https://user.eumetsat.int/news-events/news/fci-l1-data-declared-operational-and-mtg-i1-renamed-to-meteosat-12"
+    }
+  }
+}
