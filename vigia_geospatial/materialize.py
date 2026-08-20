@@ -71,6 +71,7 @@ class MaterializationConfig(BaseModel):
     sentinel_resolution_m: float = Field(gt=0, le=100)
     sentinel_lookback_days: int = Field(gt=0, le=366)
     cnig_verify_tls: bool = True
+    attempt_lidar_download: bool = True
 
     @model_validator(mode="after")
     def validate_bounds_and_parents(self) -> MaterializationConfig:
@@ -352,6 +353,10 @@ async def materialize(
 
         lidar_count = 0
         try:
+            if not config.attempt_lidar_download:
+                raise OfficialSourceError(
+                    "Reintento LiDAR omitido tras una descarga incompleta ya verificada."
+                )
             centroid = aoi.geometry.centroid
             lidar_client = CnigLidarClient(verify_tls=config.cnig_verify_tls)
             lidar_item = await lidar_client.locate(

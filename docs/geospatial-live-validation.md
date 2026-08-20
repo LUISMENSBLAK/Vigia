@@ -17,6 +17,8 @@ León, Ávila, municipios asociados y Segovia como segunda provincia de control.
 - IGN/IDEE WCS MDT: `Elevacion25830_5`, GeoTIFF real, EPSG:25830, 5 m.
 - CNIG LiDAR PNOA: catálogo real y tesela `PNOA-2025-CYL-356-4502-H30-NPC01.LAZ`, 5 puntos/m².
   La descarga llegó incompleta en los intentos realizados; validación y publicación `BLOCKED`.
+  Tras esos intentos, la configuración de esta ejecución desactiva solo la repetición de la
+  transferencia; el materializador nacional mantiene el intento habilitado por defecto.
 - Copernicus Data Space: OAuth, catálogo Sentinel-2 L2A y Process API sobre una AOI pequeña.
 - IGN/IDEE WFS ocupación del suelo: `lcv:LandCoverUnit`, dataset `siose_ar2017`, nomenclatura
   `CODIIGEValue`; el cliente pagina y conserva geometría/provenance.

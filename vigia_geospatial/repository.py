@@ -351,9 +351,14 @@ class GeospatialRepository:
                       last_ingest_at, last_observed_at, last_received_at,
                       check_interval_seconds, product_freshness_seconds, error_code, detail
                     )
-                    select id, cast(:service_state as vigia.source_state), :checked_at,
-                      case when :service_state = 'OPERATIVO' then :checked_at else null end,
-                      :last_product_at, :last_ingest_at, :last_product_at, :last_ingest_at,
+                    select id, cast(:service_state as vigia.source_state),
+                      cast(:checked_at as timestamptz),
+                      case when cast(:service_state as vigia.source_state) = 'OPERATIVO'
+                        then cast(:checked_at as timestamptz) else null end,
+                      cast(:last_product_at as timestamptz),
+                      cast(:last_ingest_at as timestamptz),
+                      cast(:last_product_at as timestamptz),
+                      cast(:last_ingest_at as timestamptz),
                       :check_interval_seconds, :product_freshness_seconds, :error_code, :detail
                     from vigia.sources where code = :source_code
                     on conflict (source_id) do update set

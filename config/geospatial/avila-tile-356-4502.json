@@ -14,5 +14,6 @@
   "lidar_resolution_m": 5.0,
   "sentinel_resolution_m": 10.0,
   "sentinel_lookback_days": 120,
-  "cnig_verify_tls": false
+  "cnig_verify_tls": false,
+  "attempt_lidar_download": false
 }
