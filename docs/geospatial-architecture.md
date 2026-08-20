@@ -64,6 +64,11 @@ la jerarquía cambia por datos, no por funciones `process_avila`. El flujo es in
 idempotente: un nuevo producto vigente invalida el anterior de la misma capa/AOI mediante
 `invalidated_at` y `superseded_by`; no lo borra.
 
+La consulta puntual resuelve también todas las unidades administrativas oficiales que cubren la
+coordenada y devuelve su id, nivel, dataset, vigencia, fuente y provenance. Cada valor raster incluye
+`data_age_seconds`, fecha, resolución, calidad y producto; la antigüedad no altera por sí misma el
+estado del servicio que lo suministró.
+
 El backend actual de storage es `LocalStorage`, confinado a `GEOSPATIAL_STORAGE_ROOT`. Su contrato
 permite sustituirlo por object storage. Las URI firmadas de proveedores nunca se guardan en
 manifiestos ni provenance.

@@ -41,5 +41,45 @@ León, Ávila, municipios asociados y Segovia como segunda provincia de control.
 
 Los Advisors de Security y Performance de Supabase permanecen `NO VERIFICADO`: las variables
 locales permiten PostgreSQL/Data API, pero no incluyen un access token de gestión del proyecto.
-No se infiere su resultado desde SQL. Los conteos definitivos de productos materializados se
-registrarán tras completar la ejecución reproducible del materializador.
+No se infiere su resultado desde SQL.
+
+## Resultado materializado
+
+La ejecución con commit `28313230cdc0713734879d72394e0f12fbace94a` produjo y persistió:
+
+- 6 unidades administrativas: país, comunidad, 2 provincias y 2 municipios;
+- 4 COG de terreno de 5 m en EPSG:25830: elevación, pendiente, orientación y ruggedness;
+- 3 COG Sentinel-2 de 10 m en EPSG:32630: NDVI, NDMI y NBR;
+- 1 producto SIOSE AR 2017 con 2.726 features para la AOI;
+- 0 productos LiDAR, por descarga oficial incompleta.
+
+La escena Sentinel-2 fue
+`S2B_MSIL2A_20260818T110619_N0512_R137_T30TUL_20260818T132515.SAFE`, adquirida el
+2026-08-18 11:19:49.772 UTC. La máscara SCL/dataMask dejó 100 % de píxeles válidos en esta muestra;
+esto no se extrapola fuera de la AOI.
+
+El área geodésica calculada es 1,000293 km². Dentro de ella: terreno válido 100 %, vegetación válida
+100 %, unión geométrica SIOSE 99,999266 % y LiDAR publicado 0 %. Los porcentajes son cobertura de
+datos de esta AOI, no precisión científica.
+
+Los siete COG pequeños son tiled, DEFLATE, nodata `-9999`, con CRS/resolución verificados. Al medir
+100×100 o 200×200 píxeles no requieren pirámides para cumplir la validación COG mínima aplicada.
+
+## Persistencia, API y regresión
+
+PostGIS remoto devolvió versión 3.3. La auditoría encontró 35 tablas internas, RLS habilitado y
+forzado en 35/35, 18 índices GiST, 41 foreign keys, 383 checks y cero grants de escritura para
+`PUBLIC`, `anon` o `authenticated`. Hay 8 productos vigentes y 4 versiones previas invalidadas con
+su relación de supersesión.
+
+`/api/geospatial/layers`, `/coverage`, `/context` y `/tiles` respondieron HTTP 200. Una consulta al
+centroide devolvió administración oficial, valores reales de terreno, NDVI/NDMI/NBR y clase SIOSE;
+LiDAR devolvió `NO DISPONIBLE`. La tesela retornó PNG desde el COG, no el GeoTIFF completo.
+
+Smoke LIVE: FIRMS autenticó y parseó correctamente una AOI pequeña con cero observaciones (cero no
+es un fallo); AEMET autenticó y parseó 10.559 observaciones del endpoint convencional. Fusion
+procesó 2.090 observaciones persistidas, obtuvo 3 candidatos y creó 3 incidentes en `VIGILANCIA`;
+ninguno fue `INCENDIO_CONFIRMADO`.
+
+EUMETSAT queda `BLOCKED`: el catálogo anónimo mostró 17 productos AFM en tres horas y el más reciente
+comenzó a las 09:10 UTC, pero OAuth devolvió `invalid_client`. No hubo descarga ni validación netCDF.

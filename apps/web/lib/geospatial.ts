@@ -22,10 +22,7 @@ export async function loadGeospatialCoverage(
   signal?: AbortSignal,
 ): Promise<GeospatialCoverageCollection> {
   const parameters = new URLSearchParams({
-    west: "-18.5",
-    south: "27.5",
-    east: "4.5",
-    north: "44.5",
+    administrative_area: "34000000000",
     limit: "1000",
   });
   const response = await fetch(`${API_BASE_URL}/api/geospatial/coverage?${parameters}`, {

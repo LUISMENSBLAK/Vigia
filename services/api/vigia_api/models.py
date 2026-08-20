@@ -179,6 +179,7 @@ class GeospatialContextResponse(BaseModel):
     longitude: float
     latitude: float
     as_of: datetime
+    administration: list[dict[str, Any]]
     terrain: dict[str, Any]
     vegetation: dict[str, Any]
     land_cover: dict[str, Any]

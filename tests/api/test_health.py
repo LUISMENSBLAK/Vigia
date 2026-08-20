@@ -105,6 +105,63 @@ async def test_database_error_is_sanitized(monkeypatch: pytest.MonkeyPatch) -> N
     assert "sensitive" not in database_status["detail"]
 
 
+def test_source_health_does_not_turn_stale_products_into_service_failure() -> None:
+    checked = datetime(2026, 8, 20, 12, tzinfo=UTC)
+    fallback = main._configuration_status()
+    rows = [
+        {
+            "code": "AEMET_OPEN_DATA",
+            "name": "AEMET OpenData",
+            "service_state": "OPERATIVO",
+            "checked_at": checked,
+            "last_success_at": checked,
+            "last_product_at": datetime(2026, 8, 19, tzinfo=UTC),
+            "last_ingest_at": checked,
+            "last_observed_at": datetime(2026, 8, 19, tzinfo=UTC),
+            "last_received_at": checked,
+            "latency_seconds": 3600,
+            "data_freshness": "STALE",
+            "service_check_overdue": False,
+            "error_code": None,
+            "detail": "API comprobada sin observaciones nuevas.",
+        }
+    ]
+
+    aemet = next(
+        item for item in main._aggregate_health(rows, fallback) if item.source == "AEMET"
+    )
+    assert aemet.state.value == "OPERATIVO"
+    assert aemet.data_freshness == "STALE"
+
+
+def test_source_health_uses_configured_check_overdue_flag() -> None:
+    checked = datetime(2026, 8, 20, 12, tzinfo=UTC)
+    fallback = main._configuration_status()
+    rows = [
+        {
+            "code": "AEMET_OPEN_DATA",
+            "name": "AEMET OpenData",
+            "service_state": "OPERATIVO",
+            "checked_at": checked,
+            "last_success_at": checked,
+            "last_product_at": None,
+            "last_ingest_at": None,
+            "last_observed_at": None,
+            "last_received_at": None,
+            "latency_seconds": None,
+            "data_freshness": "NO_DATA",
+            "service_check_overdue": True,
+            "error_code": None,
+            "detail": "API comprobada.",
+        }
+    ]
+    aemet = next(
+        item for item in main._aggregate_health(rows, fallback) if item.source == "AEMET"
+    )
+    assert aemet.state.value == "DEGRADADO"
+    assert aemet.service_check_overdue is True
+
+
 INCIDENT_ID = "11111111-1111-4111-8111-111111111111"
 
 
@@ -299,6 +356,25 @@ class GeospatialDatabase(FakeDatabase):
             }
         ]
 
+    async def administrative_context(
+        self, *, longitude: float, latitude: float, as_of: datetime
+    ) -> list[dict[str, object]]:
+        assert (longitude, latitude) == (-4.7, 40.7)
+        assert as_of == datetime(2026, 8, 20, 12, tzinfo=UTC)
+        return [
+            {
+                "external_id": "34070500000",
+                "name": "Ávila",
+                "level": "PROVINCE",
+                "dataset_version": "2026-08-20",
+                "valid_from": None,
+                "valid_to": None,
+                "retrieved_at": datetime(2026, 8, 20, 9, tzinfo=UTC),
+                "provenance_id": "administrative-provenance",
+                "source": "IGN Unidades administrativas",
+            }
+        ]
+
 
 async def test_geospatial_api_exposes_layers_coverage_and_honest_context(
     monkeypatch: pytest.MonkeyPatch,
@@ -319,6 +395,8 @@ async def test_geospatial_api_exposes_layers_coverage_and_honest_context(
     assert coverage["features"][0]["properties"]["output_resolution_m"] == 10.0
     assert context["vegetation"]["ndvi"]["value"] is None
     assert context["vegetation"]["ndvi"]["message"].startswith("NO DISPONIBLE")
+    assert context["vegetation"]["ndvi"]["data_age_seconds"] == 93600
+    assert context["administration"][0]["external_id"] == "34070500000"
     assert context["terrain"]["availability"] == "UNAVAILABLE"
 
 

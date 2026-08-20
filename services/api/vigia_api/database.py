@@ -400,6 +400,38 @@ class VigiaDatabase:
             "No se pudo consultar el contexto geoespacial.",
         )
 
+    async def administrative_context(
+        self, *, longitude: float, latitude: float, as_of: datetime
+    ) -> list[dict[str, Any]]:
+        return await self._mapped_query(
+            text(
+                """
+                select area.external_id, area.name, area.level::text,
+                  area.dataset_version, area.valid_from, area.valid_to,
+                  area.created_at as retrieved_at, area.provenance_id::text,
+                  source.name as source
+                from vigia.administrative_areas area
+                join vigia.sources source on source.id = area.source_id
+                where extensions.st_covers(
+                  area.geometry,
+                  extensions.st_setsrid(
+                    extensions.st_makepoint(:longitude, :latitude), 4326
+                  )
+                )
+                  and (area.valid_from is null or area.valid_from <= :as_of)
+                  and (area.valid_to is null or area.valid_to > :as_of)
+                order by case area.level
+                  when 'COUNTRY' then 1
+                  when 'AUTONOMOUS_COMMUNITY' then 2
+                  when 'PROVINCE' then 3
+                  when 'MUNICIPALITY' then 4
+                  else 5 end
+                """
+            ),
+            {"longitude": longitude, "latitude": latitude, "as_of": as_of},
+            "No se pudo resolver la administración territorial.",
+        )
+
     async def geospatial_product(self, product_id: str) -> dict[str, Any] | None:
         try:
             async with self._engine.connect() as connection:

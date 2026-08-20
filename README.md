@@ -120,8 +120,9 @@ obtienen PostGIS, salud de fuentes y última ejecución de workers; una credenci
 produce `OPERATIVO`.
 
 Fase 4 añade `/api/geospatial/layers`, `/api/geospatial/coverage` y
-`/api/geospatial/context`. El catálogo conserva fecha, resolución, calidad, cobertura y provenance;
-un valor raster inexistente responde `NO DISPONIBLE`.
+`/api/geospatial/context`; Fase 4B añade `/api/geospatial/tiles/{product_id}/{z}/{x}/{y}.png` y
+materialización real por AOI. El catálogo conserva fecha, resolución, calidad, cobertura y
+provenance; un valor raster inexistente responde `NO DISPONIBLE`.
 
 ## Comprobaciones
 

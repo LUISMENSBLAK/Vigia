@@ -1,7 +1,7 @@
 import json
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 from uuid import UUID, uuid4
@@ -207,15 +207,15 @@ def _worker_health(row: dict[str, Any] | None) -> SourceHealth:
     state = str(row["state"])
     checked_at = row["finished_at"] or row["started_at"]
     if state == "SUCCEEDED":
-        recent = datetime.now(UTC) - checked_at <= timedelta(minutes=15)
         return SourceHealth(
             source="Workers",
-            state=SourceState.OPERATIVO if recent else SourceState.DEGRADADO,
+            state=SourceState.OPERATIVO,
             checked_at=checked_at,
             last_received_at=row["finished_at"],
             detail=(
                 f"Última ingestión completada: {row['source']} "
-                f"({row['records_written']}/{row['records_received']} registros escritos)."
+                f"({row['records_written']}/{row['records_received']} registros escritos). "
+                "La antigüedad de este run no sustituye la cadencia por fuente."
             ),
         )
     if state == "RUNNING":
@@ -590,7 +590,11 @@ async def geospatial_context(
 ) -> GeospatialContextResponse:
     cutoff = as_of or datetime.now(UTC)
     try:
-        rows = await _require_database().geospatial_context(
+        active_database = _require_database()
+        rows = await active_database.geospatial_context(
+            longitude=lon, latitude=lat, as_of=cutoff
+        )
+        administration = await active_database.administrative_context(
             longitude=lon, latitude=lat, as_of=cutoff
         )
     except DatabaseUnavailableError as exc:
@@ -625,6 +629,19 @@ async def geospatial_context(
             "source": row["source"],
             "product_id": row["product_id"],
             "quality": row["quality"],
+            "data_age_seconds": (
+                max(
+                    0,
+                    int(
+                        (
+                            cutoff
+                            - (row["observed_at"] or row["processed_at"])
+                        ).total_seconds()
+                    ),
+                )
+                if row["observed_at"] is not None or row["processed_at"] is not None
+                else None
+            ),
         }
         entry = categories[context_category][layer.casefold()]
         if row.get("vector_value") is not None:
@@ -653,6 +670,7 @@ async def geospatial_context(
         longitude=lon,
         latitude=lat,
         as_of=cutoff,
+        administration=administration,
         provenance=provenance,
         **categories,
     )
