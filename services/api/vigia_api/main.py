@@ -2,7 +2,8 @@ import json
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from pathlib import Path
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 import structlog
@@ -10,6 +11,7 @@ from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from vigia_geospatial.aoi import AOIRequest, resolve_inline_aoi
+from vigia_geospatial.serving import render_tile, sample_raster
 
 from .config import get_settings
 from .database import DatabaseUnavailableError, VigiaDatabase
@@ -130,7 +132,6 @@ def _aggregate_health(rows: list[dict[str, Any]], fallback: SystemStatus) -> lis
             grouped.setdefault(group, []).append(row)
 
     output: list[SourceHealth] = []
-    now = datetime.now(UTC)
     state_rank = {
         SourceState.OPERATIVO: 0,
         SourceState.SIN_DATOS: 1,
@@ -145,19 +146,24 @@ def _aggregate_health(rows: list[dict[str, Any]], fallback: SystemStatus) -> lis
         health_rows: list[SourceHealth] = []
         for row in candidates:
             checked_at = row["checked_at"]
-            state = SourceState(str(row["state"]))
+            state = SourceState(str(row["service_state"]))
             detail = str(row["detail"])
-            if state is SourceState.OPERATIVO and now - checked_at > timedelta(minutes=15):
+            if state is SourceState.OPERATIVO and bool(row["service_check_overdue"]):
                 state = SourceState.DEGRADADO
-                detail = "Última comprobación correcta con más de 15 minutos de antigüedad."
+                detail = "La última comprobación del servicio excede su cadencia configurada."
             health_rows.append(
                 SourceHealth(
                     source=str(row["name"]),
                     state=state,
                     checked_at=checked_at,
+                    last_success_at=row["last_success_at"],
+                    last_product_at=row["last_product_at"],
+                    last_ingest_at=row["last_ingest_at"],
                     last_observed_at=row["last_observed_at"],
                     last_received_at=row["last_received_at"],
                     latency_seconds=row["latency_seconds"],
+                    data_freshness=cast(Any, str(row["data_freshness"])),
+                    service_check_overdue=bool(row["service_check_overdue"]),
                     error_code=row["error_code"],
                     detail=detail,
                 )
@@ -165,14 +171,27 @@ def _aggregate_health(rows: list[dict[str, Any]], fallback: SystemStatus) -> lis
         worst = max(health_rows, key=lambda item: state_rank[item.state])
         observed_values = [item.last_observed_at for item in health_rows if item.last_observed_at]
         received_values = [item.last_received_at for item in health_rows if item.last_received_at]
+        success_values = [item.last_success_at for item in health_rows if item.last_success_at]
+        product_values = [item.last_product_at for item in health_rows if item.last_product_at]
+        ingest_values = [item.last_ingest_at for item in health_rows if item.last_ingest_at]
+        freshness_rank = {"CURRENT": 0, "UNKNOWN": 1, "NO_DATA": 2, "STALE": 3}
+        freshness = max(
+            (item.data_freshness for item in health_rows),
+            key=lambda item: freshness_rank[item],
+        )
         output.append(
             SourceHealth(
                 source=configured.source,
                 state=worst.state,
                 checked_at=max(item.checked_at for item in health_rows if item.checked_at),
+                last_success_at=max(success_values) if success_values else None,
+                last_product_at=max(product_values) if product_values else None,
+                last_ingest_at=max(ingest_values) if ingest_values else None,
                 last_observed_at=max(observed_values) if observed_values else None,
                 last_received_at=max(received_values) if received_values else None,
                 latency_seconds=worst.latency_seconds,
+                data_freshness=freshness,
+                service_check_overdue=any(item.service_check_overdue for item in health_rows),
                 error_code=worst.error_code,
                 detail=worst.detail,
             )
@@ -598,9 +617,7 @@ async def geospatial_context(
             context_category = "land_cover"
         categories[context_category][layer.casefold()] = {
             "value": None,
-            "message": (
-                "NO DISPONIBLE: el catálogo cubre el punto, pero no hay lectura píxel publicada."
-            ),
+            "message": "NO DISPONIBLE",
             "availability": row["availability"],
             "observed_at": row["observed_at"],
             "processed_at": row["processed_at"],
@@ -609,6 +626,25 @@ async def geospatial_context(
             "product_id": row["product_id"],
             "quality": row["quality"],
         }
+        entry = categories[context_category][layer.casefold()]
+        if row.get("vector_value") is not None:
+            entry["value"] = row["vector_value"]
+            entry["message"] = "Valor vectorial oficial disponible para el punto."
+        elif row.get("storage_uri") and row.get("raster_band"):
+            try:
+                value = sample_raster(
+                    str(row["storage_uri"]),
+                    longitude=lon,
+                    latitude=lat,
+                    band=int(row["raster_band"]),
+                    storage_root=Path(settings.GEOSPATIAL_STORAGE_ROOT),
+                )
+            except ValueError:
+                value = None
+            if value is not None:
+                entry["value"] = value
+                entry["units"] = row["value_units"]
+                entry["message"] = "Valor muestreado del COG materializado."
         provenance.append({"product_id": row["product_id"], "provenance_id": row["provenance_id"]})
     for category_payload in categories.values():
         if not category_payload:
@@ -619,4 +655,33 @@ async def geospatial_context(
         as_of=cutoff,
         provenance=provenance,
         **categories,
+    )
+
+
+@app.get("/api/geospatial/tiles/{product_id}/{z}/{x}/{y}.png", tags=["geospatial"])
+async def geospatial_tile(product_id: UUID, z: int, x: int, y: int) -> Response:
+    if z < 0 or z > 18:
+        raise HTTPException(status_code=422, detail="Nivel de zoom fuera de rango.")
+    try:
+        row = await _require_database().geospatial_product(str(product_id))
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc
+    if row is None or not row["storage_uri"] or not row["raster_band"]:
+        raise HTTPException(status_code=404, detail="Tesela NO DISPONIBLE.")
+    try:
+        content = render_tile(
+            str(row["storage_uri"]),
+            band=int(row["raster_band"]),
+            layer=str(row["layer"]),
+            z=z,
+            x=x,
+            y=y,
+            storage_root=Path(settings.GEOSPATIAL_STORAGE_ROOT),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Tesela NO DISPONIBLE.") from exc
+    return Response(
+        content=content,
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=3600"},
     )

@@ -30,6 +30,11 @@ CRS de entrada/salida, resolución de entrada/salida, remuestreo, algoritmo, foo
 storage URI y output hash. `download_manifests` registra solicitud, finalización, tamaño, checksum,
 ETag, estado y hash de AOI, pero nunca tokens.
 
+Fase 4B añade banda raster, unidades, `published_at`, `invalidated_at`, relación de supersesión y
+`render_hint`. Un artefacto nuevo invalida lógicamente al anterior de la misma capa y footprint;
+los registros previos siguen auditables. SIOSE conserva cada feature oficial con id externo,
+nomenclatura, porcentaje declarado, fecha y geometría, enlazada al producto padre.
+
 `AVAILABLE` requiere un artefacto local/objeto y hash verificables. Un registro de catálogo o una
 respuesta HTTP correcta no basta para declarar una capa disponible. El `as_of` de API y Replay
 filtra tanto adquisición como procesamiento para impedir future leakage.

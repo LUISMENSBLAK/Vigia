@@ -64,8 +64,10 @@ class VigiaDatabase:
     async def source_health(self) -> list[dict[str, Any]]:
         statement = text(
             """
-            select code, name, state::text, checked_at, last_observed_at, last_received_at,
-                   latency_seconds, error_code, detail
+            select code, name, service_state::text, checked_at, last_success_at,
+                   last_product_at, last_ingest_at, last_observed_at, last_received_at,
+                   latency_seconds, data_freshness, service_check_overdue,
+                   error_code, detail
             from api.source_health
             order by name
             """
@@ -277,6 +279,7 @@ class VigiaDatabase:
                   max(observed_at) as latest_observed_at,
                   min(output_resolution_m) as finest_resolution_m
                 from vigia.geospatial_products
+                where invalidated_at is null
                 group by layer, availability
                 order by layer, availability
                 """
@@ -319,8 +322,9 @@ class VigiaDatabase:
                 )
                 select product.id::text, product.product_id, product.layer,
                   product.availability::text, product.observed_at,
-                  product.output_resolution_m, source.name as source,
+                  product.processed_at, product.output_resolution_m, source.name as source,
                   product.quality, product.is_experimental,
+                  product.raster_band, product.value_units, product.render_hint,
                   extensions.st_asgeojson(product.footprint)::jsonb as geometry
                 from vigia.geospatial_products product
                 join vigia.sources source on source.id = product.source_id
@@ -329,6 +333,7 @@ class VigiaDatabase:
                   and extensions.st_intersects(product.footprint, query_aoi.geometry)
                   and (product.observed_at is null or product.observed_at <= :as_of)
                   and (product.processed_at is null or product.processed_at <= :as_of)
+                  and product.invalidated_at is null
                 order by product.observed_at desc nulls last, product.product_id
                 limit :limit
                 """
@@ -357,7 +362,26 @@ class VigiaDatabase:
                   product.id::text, product.product_id, product.layer,
                   product.availability::text, product.observed_at, product.processed_at,
                   product.output_resolution_m, product.quality, product.provenance_id::text,
-                  source.name as source
+                  product.storage_uri, product.raster_band, product.value_units,
+                  product.render_hint, source.name as source,
+                  case when product.layer = 'LAND_COVER' then (
+                    select jsonb_build_object(
+                      'class_code', feature.class_code,
+                      'class_uri', feature.class_uri,
+                      'covered_percentage', feature.covered_percentage,
+                      'observed_at', feature.observed_at
+                    )
+                    from vigia.land_cover_features feature
+                    where feature.product_id = product.id
+                      and extensions.st_covers(
+                        feature.geometry,
+                        extensions.st_setsrid(
+                          extensions.st_makepoint(:longitude, :latitude), 4326
+                        )
+                      )
+                    order by feature.covered_percentage desc nulls last, feature.external_id
+                    limit 1
+                  ) else null end as vector_value
                 from vigia.geospatial_products product
                 join vigia.sources source on source.id = product.source_id
                 where extensions.st_covers(
@@ -368,12 +392,35 @@ class VigiaDatabase:
                 )
                   and (product.observed_at is null or product.observed_at <= :as_of)
                   and (product.processed_at is null or product.processed_at <= :as_of)
+                  and product.invalidated_at is null
                 order by product.layer, product.observed_at desc nulls last
                 """
             ),
             {"longitude": longitude, "latitude": latitude, "as_of": as_of},
             "No se pudo consultar el contexto geoespacial.",
         )
+
+    async def geospatial_product(self, product_id: str) -> dict[str, Any] | None:
+        try:
+            async with self._engine.connect() as connection:
+                row = (
+                    await connection.execute(
+                        text(
+                            """
+                            select id::text, product_id, layer, availability::text,
+                              storage_uri, raster_band, value_units, render_hint
+                            from vigia.geospatial_products
+                            where id = cast(:product_id as uuid)
+                              and availability in ('AVAILABLE', 'PARTIAL')
+                              and invalidated_at is null
+                            """
+                        ),
+                        {"product_id": product_id},
+                    )
+                ).mappings().one_or_none()
+        except (SQLAlchemyError, OSError) as exc:
+            raise DatabaseUnavailableError("No se pudo consultar el producto geoespacial.") from exc
+        return dict(row) if row is not None else None
 
     async def _mapped_query(
         self, statement: Any, parameters: dict[str, Any], safe_error: str

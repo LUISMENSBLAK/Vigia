@@ -17,7 +17,12 @@ import {
   loadIncidents,
   unavailableIncidents,
 } from "@/lib/incidents";
-import { layerAvailability, loadGeospatialLayers } from "@/lib/geospatial";
+import {
+  emptyGeospatialCoverage,
+  layerAvailability,
+  loadGeospatialCoverage,
+  loadGeospatialLayers,
+} from "@/lib/geospatial";
 import type {
   FireObservationCollection,
   FireObservationFeature,
@@ -25,6 +30,7 @@ import type {
   IncidentDetail,
   IncidentFeature,
   GeospatialLayerStatus,
+  GeospatialCoverageCollection,
 } from "@/lib/types";
 
 import { IncidentDetailPanel } from "./incident-detail";
@@ -48,10 +54,11 @@ const inactiveLayers = [
 ];
 
 const geospatialLayers = [
-  { label: "Terrain", codes: ["ELEVATION", "SLOPE", "ASPECT", "TERRAIN_RUGGEDNESS"] },
-  { label: "Vegetation", codes: ["NDVI", "NDMI", "NBR"] },
-  { label: "Land Cover", codes: ["LAND_COVER"] },
+  { key: "terrain", label: "Terrain", codes: ["ELEVATION", "SLOPE", "ASPECT", "TERRAIN_RUGGEDNESS"] },
+  { key: "vegetation", label: "Vegetation", codes: ["NDVI", "NDMI", "NBR"] },
+  { key: "landCover", label: "Land Cover", codes: ["LAND_COVER"] },
   {
+    key: "coverage",
     label: "Cobertura de datos",
     codes: [
       "ELEVATION",
@@ -117,7 +124,15 @@ export function MapWorkspace() {
   const [showObservations, setShowObservations] = useState(true);
   const [showIncidents, setShowIncidents] = useState(true);
   const [geospatialStatus, setGeospatialStatus] = useState<GeospatialLayerStatus[]>([]);
+  const [geospatialCoverage, setGeospatialCoverage] =
+    useState<GeospatialCoverageCollection>(emptyGeospatialCoverage);
   const [geospatialLoading, setGeospatialLoading] = useState(true);
+  const [visibleGeospatial, setVisibleGeospatial] = useState<Record<string, boolean>>({
+    terrain: false,
+    vegetation: false,
+    landCover: false,
+    coverage: true,
+  });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -136,10 +151,19 @@ export function MapWorkspace() {
 
   useEffect(() => {
     const controller = new AbortController();
-    loadGeospatialLayers(controller.signal)
-      .then(setGeospatialStatus)
+    Promise.all([
+      loadGeospatialLayers(controller.signal),
+      loadGeospatialCoverage(controller.signal),
+    ])
+      .then(([layers, coverage]) => {
+        setGeospatialStatus(layers);
+        setGeospatialCoverage(coverage);
+      })
       .catch(() => {
-        if (!controller.signal.aborted) setGeospatialStatus([]);
+        if (!controller.signal.aborted) {
+          setGeospatialStatus([]);
+          setGeospatialCoverage(emptyGeospatialCoverage);
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setGeospatialLoading(false);
@@ -197,7 +221,10 @@ export function MapWorkspace() {
       <aside className="layers-panel" aria-label="Capas del mapa">
         <div className="panel-heading">
           <span>Capas de análisis</span>
-          <small>{Number(showObservations) + Number(showIncidents)} activas</small>
+          <small>
+            {Number(showObservations) + Number(showIncidents)
+              + Object.values(visibleGeospatial).filter(Boolean).length} activas
+          </small>
         </div>
         <div className="layer-list">
           <label>
@@ -222,9 +249,18 @@ export function MapWorkspace() {
             const availability = geospatialLoading
               ? "VERIFICANDO"
               : layerAvailability(geospatialStatus, layer.codes);
+            const usable = availability === "DISPONIBLE" || availability === "PARCIAL";
             return (
               <label key={layer.label}>
-                <input type="checkbox" disabled />
+                <input
+                  type="checkbox"
+                  checked={visibleGeospatial[layer.key] ?? false}
+                  disabled={!usable}
+                  onChange={(event) => setVisibleGeospatial((current) => ({
+                    ...current,
+                    [layer.key]: event.target.checked,
+                  }))}
+                />
                 <span>{layer.label}</span>
                 <small>{availability}</small>
               </label>
@@ -248,6 +284,11 @@ export function MapWorkspace() {
           incidents={incidents}
           showObservations={showObservations}
           showIncidents={showIncidents}
+          geospatialCoverage={geospatialCoverage}
+          showTerrain={visibleGeospatial.terrain ?? false}
+          showVegetation={visibleGeospatial.vegetation ?? false}
+          showLandCover={visibleGeospatial.landCover ?? false}
+          showDataCoverage={visibleGeospatial.coverage ?? false}
           onSelectObservation={selectObservation}
           onSelectIncident={selectIncident}
         />

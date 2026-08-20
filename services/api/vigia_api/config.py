@@ -32,6 +32,7 @@ class Settings(BaseSettings):
         "protocol/openid-connect/token"
     )
     COPERNICUS_SH_BASE_URL: str = "https://sh.dataspace.copernicus.eu"
+    GEOSPATIAL_STORAGE_ROOT: str = "data"
 
     @field_validator("CORS_ALLOWED_ORIGINS", mode="before")
     @classmethod

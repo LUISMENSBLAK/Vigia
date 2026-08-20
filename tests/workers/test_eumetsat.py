@@ -6,6 +6,7 @@ import pytest
 from workers.eumetsat.client import (
     EumetsatAuthenticationError,
     EumetsatClient,
+    EumetsatDiscoveryClient,
     MissingEumetsatCredentialsError,
 )
 
@@ -78,3 +79,22 @@ async def test_authentication_error_never_contains_credentials() -> None:
         await client.access_token()
     assert "consumer-key" not in str(raised.value)
     assert "consumer-secret" not in str(raised.value)
+
+
+async def test_anonymous_discovery_does_not_send_authorization() -> None:
+    start = datetime(2026, 8, 20, 7, tzinfo=UTC)
+    end = start + timedelta(minutes=20)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert "authorization" not in request.headers
+        assert request.url.params["pi"] == "EO:EUM:DAT:0682"
+        return httpx.Response(200, json={"totalResults": 1, "features": [{"id": "real-id"}]})
+
+    client = EumetsatDiscoveryClient(
+        base_url="https://eumetsat.test",
+        transport=httpx.MockTransport(handler),
+    )
+    result = await client.search_products(
+        "EO:EUM:DAT:0682", start=start, end=end, limit=1
+    )
+    assert result["features"][0]["id"] == "real-id"

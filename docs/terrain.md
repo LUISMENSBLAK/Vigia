@@ -2,17 +2,22 @@
 
 ## Fuentes y productos
 
-La fuente prioritaria es CNIG/IGN-PNOA. El Centro de Descargas publica MDT y MDS oficiales en varias
-resoluciones; la resolución concreta se lee del producto y nunca se presupone. Para cada AOI se
-conserva el raster de elevación aceptado y se pueden derivar:
+La primera fuente materializable es el WCS oficial MDT del IGN/IDEE
+`https://servicios.idee.es/wcs-inspire/mdt`. La cobertura `Elevacion25830_5` declara ETRS89 / UTM
+30N y paso de 5 m. El pipeline solicita únicamente el recorte de la AOI, conserva el GeoTIFF raw y
+deriva:
 
 - pendiente, en grados;
 - orientación, en grados azimutales;
-- ruggedness, como diferencia media absoluta respecto de vecinos;
+- ruggedness, como terrain ruggedness index de vecinos;
 - elevación original, en las unidades declaradas por el producto.
 
 La fórmula y versión de cada derivado se guardan como `algorithm` y `software_version`. No se
 calculan métricas sobre EPSG:4326: el raster debe utilizar un CRS proyectado en metros.
+
+La AOI inicial mide 1×1 km en EPSG:25830. No representa cobertura nacional: el catálogo y el mapa
+publican su footprint exacto. Ampliar España exige iterar AOIs/teselas, nunca inferir cobertura a
+partir de esa muestra.
 
 ## Validación raster y COG
 

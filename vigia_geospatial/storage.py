@@ -6,6 +6,7 @@ from typing import Protocol
 
 class ObjectStorage(Protocol):
     def exists(self, key: str) -> bool: ...
+    def get(self, key: str) -> bytes: ...
     def put(self, key: str, content: bytes) -> tuple[str, str]: ...
     def uri(self, key: str) -> str: ...
 
@@ -26,6 +27,12 @@ class LocalStorage:
 
     def exists(self, key: str) -> bool:
         return self._path(key).is_file()
+
+    def get(self, key: str) -> bytes:
+        path = self._path(key)
+        if not path.is_file():
+            raise FileNotFoundError("El objeto solicitado no existe.")
+        return path.read_bytes()
 
     def put(self, key: str, content: bytes) -> tuple[str, str]:
         target = self._path(key)

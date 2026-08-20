@@ -5,9 +5,12 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef } from "react";
 import * as maplibregl from "maplibre-gl";
 
+import { geospatialTileUrl } from "@/lib/geospatial";
 import type {
   FireObservationCollection,
   FireObservationFeature,
+  GeospatialCoverageCollection,
+  GeospatialCoverageFeature,
   IncidentCollection,
   IncidentFeature,
 } from "@/lib/types";
@@ -17,8 +20,85 @@ interface MapCanvasProps {
   incidents: IncidentCollection;
   showObservations: boolean;
   showIncidents: boolean;
+  geospatialCoverage: GeospatialCoverageCollection;
+  showTerrain: boolean;
+  showVegetation: boolean;
+  showLandCover: boolean;
+  showDataCoverage: boolean;
   onSelectObservation: (observation: FireObservationFeature) => void;
   onSelectIncident: (incident: IncidentFeature) => void;
+}
+
+function preferredProduct(
+  coverage: GeospatialCoverageCollection,
+  layers: string[],
+): GeospatialCoverageFeature | undefined {
+  return coverage.features.find(
+    (feature) =>
+      layers.includes(feature.properties.layer)
+      && feature.properties.raster_band !== null
+      && ["AVAILABLE", "PARTIAL"].includes(feature.properties.availability),
+  );
+}
+
+function syncRasterLayer(
+  map: maplibregl.Map,
+  id: string,
+  product: GeospatialCoverageFeature | undefined,
+  visible: boolean,
+): void {
+  const layerId = `${id}-raster`;
+  const sourceId = `${id}-source`;
+  if (map.getLayer(layerId)) map.removeLayer(layerId);
+  if (map.getSource(sourceId)) map.removeSource(sourceId);
+  if (!product) return;
+  map.addSource(sourceId, {
+    type: "raster",
+    tiles: [geospatialTileUrl(product.properties.id)],
+    tileSize: 256,
+    minzoom: 0,
+    maxzoom: 18,
+  });
+  map.addLayer({
+    id: layerId,
+    type: "raster",
+    source: sourceId,
+    layout: { visibility: visible ? "visible" : "none" },
+    paint: { "raster-opacity": 0.72, "raster-fade-duration": 0 },
+  });
+}
+
+function syncGeospatialLayers(
+  map: maplibregl.Map,
+  coverage: GeospatialCoverageCollection,
+  visibility: { terrain: boolean; vegetation: boolean; landCover: boolean; coverage: boolean },
+): void {
+  const source = map.getSource("geospatial-coverage") as maplibregl.GeoJSONSource | undefined;
+  source?.setData(coverage);
+  syncRasterLayer(
+    map,
+    "geospatial-terrain",
+    preferredProduct(coverage, ["ELEVATION", "SLOPE"]),
+    visibility.terrain,
+  );
+  syncRasterLayer(
+    map,
+    "geospatial-vegetation",
+    preferredProduct(coverage, ["NDVI", "NDMI", "NBR"]),
+    visibility.vegetation,
+  );
+  if (map.getLayer("geospatial-land-cover")) {
+    map.setLayoutProperty(
+      "geospatial-land-cover",
+      "visibility",
+      visibility.landCover ? "visible" : "none",
+    );
+  }
+  for (const layer of ["geospatial-coverage-fill", "geospatial-coverage-line"]) {
+    if (map.getLayer(layer)) {
+      map.setLayoutProperty(layer, "visibility", visibility.coverage ? "visible" : "none");
+    }
+  }
 }
 
 export function MapCanvas({
@@ -26,6 +106,11 @@ export function MapCanvas({
   incidents,
   showObservations,
   showIncidents,
+  geospatialCoverage,
+  showTerrain,
+  showVegetation,
+  showLandCover,
+  showDataCoverage,
   onSelectObservation,
   onSelectIncident,
 }: MapCanvasProps) {
@@ -35,6 +120,13 @@ export function MapCanvas({
   const incidentsRef = useRef(incidents);
   const showObservationsRef = useRef(showObservations);
   const showIncidentsRef = useRef(showIncidents);
+  const geospatialCoverageRef = useRef(geospatialCoverage);
+  const geospatialVisibilityRef = useRef({
+    terrain: showTerrain,
+    vegetation: showVegetation,
+    landCover: showLandCover,
+    coverage: showDataCoverage,
+  });
 
   useEffect(() => {
     if (!container.current) return;
@@ -49,6 +141,55 @@ export function MapCanvas({
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
     map.on("load", () => {
+      map.addSource("geospatial-coverage", {
+        type: "geojson",
+        data: geospatialCoverageRef.current,
+      });
+      map.addLayer({
+        id: "geospatial-land-cover",
+        type: "fill",
+        source: "geospatial-coverage",
+        filter: ["==", ["get", "layer"], "LAND_COVER"],
+        layout: {
+          visibility: geospatialVisibilityRef.current.landCover ? "visible" : "none",
+        },
+        paint: {
+          "fill-color": "#7b8f56",
+          "fill-opacity": 0.3,
+          "fill-outline-color": "#53643b",
+        },
+      });
+      map.addLayer({
+        id: "geospatial-coverage-fill",
+        type: "fill",
+        source: "geospatial-coverage",
+        layout: {
+          visibility: geospatialVisibilityRef.current.coverage ? "visible" : "none",
+        },
+        paint: {
+          "fill-color": [
+            "match", ["get", "availability"],
+            "AVAILABLE", "#4f8a75",
+            "PARTIAL", "#c69a48",
+            "#8b938e",
+          ],
+          "fill-opacity": 0.1,
+        },
+      });
+      map.addLayer({
+        id: "geospatial-coverage-line",
+        type: "line",
+        source: "geospatial-coverage",
+        layout: {
+          visibility: geospatialVisibilityRef.current.coverage ? "visible" : "none",
+        },
+        paint: { "line-color": "#315e51", "line-width": 1.4, "line-opacity": 0.8 },
+      });
+      syncGeospatialLayers(
+        map,
+        geospatialCoverageRef.current,
+        geospatialVisibilityRef.current,
+      );
       map.addSource("thermal-observations", {
         type: "geojson",
         data: observationsRef.current,
@@ -147,6 +288,24 @@ export function MapCanvas({
         );
         if (selected) onSelectIncident(selected);
       });
+      map.on("click", "geospatial-coverage-fill", (event) => {
+        const properties = event.features?.[0]?.properties;
+        if (!properties || !event.lngLat) return;
+        const observedAt = properties.observed_at || "NO DISPONIBLE";
+        const resolution = properties.output_resolution_m
+          ? `${properties.output_resolution_m} m`
+          : "NO DISPONIBLE";
+        new maplibregl.Popup({ closeButton: true, maxWidth: "320px" })
+          .setLngLat(event.lngLat)
+          .setHTML(
+            `<strong>${String(properties.layer)}</strong><br>`
+              + `Estado: ${String(properties.availability)}<br>`
+              + `Fuente: ${String(properties.source)}<br>`
+              + `Fecha: ${String(observedAt)}<br>`
+              + `Resolución: ${String(resolution)}`,
+          )
+          .addTo(map);
+      });
       for (const layer of ["thermal-clusters", "thermal-points", "incident-points"]) {
         map.on("mouseenter", layer, () => {
           map.getCanvas().style.cursor = "pointer";
@@ -177,6 +336,20 @@ export function MapCanvas({
       | undefined;
     source?.setData(incidents);
   }, [incidents]);
+
+  useEffect(() => {
+    geospatialCoverageRef.current = geospatialCoverage;
+    geospatialVisibilityRef.current = {
+      terrain: showTerrain,
+      vegetation: showVegetation,
+      landCover: showLandCover,
+      coverage: showDataCoverage,
+    };
+    const map = mapRef.current;
+    if (map?.isStyleLoaded()) {
+      syncGeospatialLayers(map, geospatialCoverage, geospatialVisibilityRef.current);
+    }
+  }, [geospatialCoverage, showTerrain, showVegetation, showLandCover, showDataCoverage]);
 
   useEffect(() => {
     showObservationsRef.current = showObservations;

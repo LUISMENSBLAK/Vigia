@@ -125,3 +125,31 @@ export interface GeospatialLayerStatus {
   finest_resolution_m: number | null;
   message: string;
 }
+
+export interface GeospatialCoverageProperties {
+  id: string;
+  product_id: string;
+  layer: string;
+  availability: GeospatialAvailability;
+  observed_at: string | null;
+  processed_at: string;
+  output_resolution_m: number | null;
+  source: string;
+  quality: Record<string, unknown>;
+  is_experimental: boolean;
+  raster_band: number | null;
+  value_units: string | null;
+  render_hint: Record<string, unknown>;
+}
+
+export interface GeospatialCoverageFeature {
+  type: "Feature";
+  geometry: GeoJSON.Geometry;
+  properties: GeospatialCoverageProperties;
+}
+
+export interface GeospatialCoverageCollection {
+  type: "FeatureCollection";
+  features: GeospatialCoverageFeature[];
+  as_of: string;
+}

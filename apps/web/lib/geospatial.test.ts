@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { layerAvailability } from "./geospatial";
+import { geospatialTileUrl, layerAvailability } from "./geospatial";
 
 describe("geospatial layer status", () => {
   it("does not claim availability without catalogued products", () => {
@@ -23,5 +23,11 @@ describe("geospatial layer status", () => {
         ["NDVI", "NDMI", "NBR"],
       ),
     ).toBe("PARCIAL");
+  });
+
+  it("builds an API tile template without embedding credentials", () => {
+    const url = geospatialTileUrl("9a3d26dc-0147-4f2e-8309-908f7814e15a");
+    expect(url).toContain("/api/geospatial/tiles/9a3d26dc-0147-4f2e-8309-908f7814e15a/{z}/{x}/{y}.png");
+    expect(url).not.toContain("token");
   });
 });

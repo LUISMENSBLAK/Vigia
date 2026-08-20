@@ -14,6 +14,10 @@ los píxeles con `dataMask=0` se convierten en nodata antes de calcular índices
 cover del catálogo reduce candidatos, pero no sustituye el enmascarado por píxel. La calidad debe
 registrar porcentaje válido y método de máscara.
 
+Fase 4B descarga además un stack fuente con B04, B08, B11, B12, SCL y `dataMask`. Los índices se
+publican como COG separados de 10 m. El porcentaje válido procede de los píxeles reales de la AOI;
+el cloud cover de catálogo permanece como metadata de escena y no lo sustituye.
+
 ## Tiempo y Replay
 
 Cada valor conserva `observed_at`, `processed_at`, product id y resolución. Una consulta con
@@ -22,7 +26,8 @@ esta barrera para evitar data leakage durante Replay.
 
 ## Cobertura y fuel proxy
 
-Vegetación disponible, cobertura del suelo y modelo de combustible son conceptos distintos. CORINE
-puede aportar `LAND_COVER`; no se presenta como combustible. Una combinación futura de cobertura,
+Vegetación disponible, cobertura del suelo y modelo de combustible son conceptos distintos. La
+primera capa vectorial usa SIOSE AR 2017 del WFS oficial IGN/IDEE; no se presenta como combustible.
+Una combinación futura de cobertura,
 altura, continuidad e índices solo podrá llamarse `FUEL_PROXY`, deberá ser `EXPERIMENTAL` y mostrar
 sus faltantes y fecha. No se infieren biomasa ni humedad sin datos y validación adecuados.

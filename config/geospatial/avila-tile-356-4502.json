@@ -1,0 +1,18 @@
+{
+  "id": "es-avila-pnoa-356-4502-h30",
+  "description": "AOI de validación de 1 km² definida por una tesela oficial PNOA LiDAR.",
+  "bounds": [356000.0, 4501000.0, 357000.0, 4502000.0],
+  "crs": "EPSG:25830",
+  "administrative_units": [
+    {"national_code": "34000000000", "parent": null, "provider": "GISCO", "provider_id": "ES"},
+    {"national_code": "34070000000", "parent": "34000000000"},
+    {"national_code": "34070500000", "parent": "34070000000"},
+    {"national_code": "34070505019", "parent": "34070500000"},
+    {"national_code": "34070505245", "parent": "34070500000"},
+    {"national_code": "34074000000", "parent": "34070000000"}
+  ],
+  "lidar_resolution_m": 5.0,
+  "sentinel_resolution_m": 10.0,
+  "sentinel_lookback_days": 120,
+  "cnig_verify_tls": false
+}

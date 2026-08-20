@@ -59,10 +59,14 @@ class GeospatialProduct(BaseModel):
     footprint_geojson: dict[str, Any]
     source_crs: str
     output_crs: str
-    source_resolution_m: float = Field(gt=0)
-    output_resolution_m: float = Field(gt=0)
+    source_resolution_m: float | None = Field(default=None, gt=0)
+    output_resolution_m: float | None = Field(default=None, gt=0)
     resampling_algorithm: str | None = None
     nodata: float | int | None = None
+    raster_band: int | None = Field(default=1, gt=0)
+    value_units: str | None = None
+    published_at: datetime | None = None
+    render_hint: dict[str, Any] = Field(default_factory=dict)
     quality: dict[str, Any] = Field(default_factory=dict)
     input_hashes: tuple[str, ...] = ()
     output_hash: str | None = None

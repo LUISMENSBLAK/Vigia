@@ -184,6 +184,18 @@ function evaluatePixel(s) {
 }
 """
 
+SENTINEL_2_SOURCE_EVALSCRIPT = """//VERSION=3
+function setup() {
+  return {
+    input: ["B04", "B08", "B11", "B12", "SCL", "dataMask"],
+    output: { bands: 6, sampleType: "FLOAT32" }
+  };
+}
+function evaluatePixel(s) {
+  return [s.B04, s.B08, s.B11, s.B12, s.SCL, s.dataMask];
+}
+"""
+
 
 def sentinel_2_index_request(
     *,
@@ -220,4 +232,53 @@ def sentinel_2_index_request(
             "responses": [{"identifier": "default", "format": {"type": "image/tiff"}}],
         },
         "evalscript": SENTINEL_2_INDEX_EVALSCRIPT,
+    }
+
+
+def sentinel_2_projected_request(
+    *,
+    bounds: tuple[float, float, float, float],
+    crs_epsg: int,
+    start: datetime,
+    end: datetime,
+    width: int,
+    height: int,
+    source_bands: bool = False,
+) -> dict[str, Any]:
+    if crs_epsg not in {25828, 25829, 25830, 25831, 32628, 32629, 32630, 32631}:
+        raise ValueError("El CRS Sentinel-2 debe ser UTM métrico admitido para España.")
+    if width <= 0 or height <= 0 or width * height > 4_000_000:
+        raise ValueError("La salida debe ser positiva y no superar cuatro millones de píxeles.")
+    if start.tzinfo is None or end.tzinfo is None or end <= start:
+        raise ValueError("La ventana temporal debe ser válida y contener zona horaria.")
+    west, south, east, north = bounds
+    if not (west < east and south < north):
+        raise ValueError("Los límites proyectados no son válidos.")
+    return {
+        "input": {
+            "bounds": {
+                "bbox": list(bounds),
+                "properties": {
+                    "crs": f"http://www.opengis.net/def/crs/EPSG/0/{crs_epsg}"
+                },
+            },
+            "data": [
+                {
+                    "type": SENTINEL_COLLECTIONS["sentinel-2"],
+                    "dataFilter": {
+                        "timeRange": {"from": start.isoformat(), "to": end.isoformat()},
+                        "mosaickingOrder": "leastCC",
+                        "maxCloudCoverage": 30,
+                    },
+                }
+            ],
+        },
+        "output": {
+            "width": width,
+            "height": height,
+            "responses": [{"identifier": "default", "format": {"type": "image/tiff"}}],
+        },
+        "evalscript": (
+            SENTINEL_2_SOURCE_EVALSCRIPT if source_bands else SENTINEL_2_INDEX_EVALSCRIPT
+        ),
     }

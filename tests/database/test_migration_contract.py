@@ -3,6 +3,7 @@ from pathlib import Path
 MIGRATION = Path("database/migrations/20260816000000_initial_vigia.sql")
 PHASE3_MIGRATION = Path("database/migrations/20260820000000_phase3_fusion.sql")
 PHASE4_MIGRATION = Path("database/migrations/20260820010000_phase4_geospatial.sql")
+PHASE4B_MIGRATION = Path("database/migrations/20260820020000_phase4b_real_geospatial.sql")
 
 
 def migration_sql() -> str:
@@ -15,6 +16,10 @@ def phase3_sql() -> str:
 
 def phase4_sql() -> str:
     return PHASE4_MIGRATION.read_text(encoding="utf-8").casefold()
+
+
+def phase4b_sql() -> str:
+    return PHASE4B_MIGRATION.read_text(encoding="utf-8").casefold()
 
 
 def test_migration_keeps_private_and_api_schemas() -> None:
@@ -159,3 +164,26 @@ def test_phase4_private_tables_force_rls() -> None:
     ):
         assert f"alter table vigia.{table} enable row level security" in sql
         assert f"alter table vigia.{table} force row level security" in sql
+
+
+def test_phase4b_separates_service_health_from_product_freshness() -> None:
+    sql = phase4b_sql()
+    for field in (
+        "last_success_at",
+        "last_product_at",
+        "last_ingest_at",
+        "check_interval_seconds",
+        "product_freshness_seconds",
+    ):
+        assert field in sql
+    assert "service_check_overdue" in sql
+    assert "data_freshness" in sql
+
+
+def test_phase4b_land_cover_and_product_lifecycle_stay_private() -> None:
+    sql = phase4b_sql()
+    assert "create table vigia.land_cover_features" in sql
+    assert "alter table vigia.land_cover_features enable row level security" in sql
+    assert "alter table vigia.land_cover_features force row level security" in sql
+    for field in ("published_at", "invalidated_at", "superseded_by", "render_hint"):
+        assert field in sql

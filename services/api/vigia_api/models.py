@@ -16,9 +16,14 @@ class SourceHealth(BaseModel):
     source: str
     state: SourceState
     checked_at: datetime | None = None
+    last_success_at: datetime | None = None
+    last_product_at: datetime | None = None
+    last_ingest_at: datetime | None = None
     last_observed_at: datetime | None = None
     last_received_at: datetime | None = None
     latency_seconds: int | None = Field(default=None, ge=0)
+    data_freshness: Literal["CURRENT", "STALE", "NO_DATA", "UNKNOWN"] = "UNKNOWN"
+    service_check_overdue: bool = False
     error_code: str | None = None
     detail: str
 

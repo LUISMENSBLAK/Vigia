@@ -171,15 +171,25 @@ class FirmsRepository:
             """
             insert into vigia.source_health (
               source_id, state, checked_at, last_observed_at, last_received_at,
-              latency_seconds, error_code, detail
+              latency_seconds, error_code, detail, last_success_at,
+              last_product_at, last_ingest_at, check_interval_seconds,
+              product_freshness_seconds
             )
             values (
               :source_id, cast(:state as vigia.source_state), :checked_at,
-              :last_observed_at, :last_received_at, :latency_seconds, null, :detail
+              :last_observed_at, :last_received_at, :latency_seconds, null, :detail,
+              :checked_at, :last_observed_at, :last_received_at, 21600, 43200
             )
             on conflict (source_id) do update set
               state = excluded.state,
               checked_at = excluded.checked_at,
+              last_success_at = excluded.last_success_at,
+              last_product_at = coalesce(
+                excluded.last_product_at, vigia.source_health.last_product_at
+              ),
+              last_ingest_at = coalesce(
+                excluded.last_ingest_at, vigia.source_health.last_ingest_at
+              ),
               last_observed_at = coalesce(
                 excluded.last_observed_at, vigia.source_health.last_observed_at
               ),
@@ -189,6 +199,8 @@ class FirmsRepository:
               latency_seconds = coalesce(
                 excluded.latency_seconds, vigia.source_health.latency_seconds
               ),
+              check_interval_seconds = excluded.check_interval_seconds,
+              product_freshness_seconds = excluded.product_freshness_seconds,
               error_code = null,
               detail = excluded.detail
             """

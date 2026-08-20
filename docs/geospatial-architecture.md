@@ -48,9 +48,25 @@ Los endpoints son:
 - `GET /api/geospatial/layers`: estado agregado por capa.
 - `GET /api/geospatial/coverage`: footprints que intersectan un bbox y existían en `as_of`.
 - `GET /api/geospatial/context`: productos que cubren un punto en `as_of`.
+- `GET /api/geospatial/tiles/{product_id}/{z}/{x}/{y}.png`: teselas PNG generadas desde el COG
+  materializado, sin exponer rutas locales.
 
-El contexto actual devuelve metadatos y `NO DISPONIBLE` para valores de píxel hasta que se publique
-un lector de COG seguro. Esto evita aparentar datos que el catálogo todavía no puede servir.
+El contexto muestrea los COG locales cuando el nodo posee el artefacto y devuelve clases SIOSE
+vectoriales donde existe cobertura. Si el nodo no comparte el almacenamiento, el valor permanece
+`NO DISPONIBLE`; la metadata no se convierte en un valor inventado. El mapa consume los mismos
+footprints y endpoints y diferencia la capa científica de la capa «Cobertura de datos».
+
+## Materializador 4B
+
+`scripts/materialize_phase4b.py` recibe un JSON de AOI proyectada. La configuración inicial cubre
+una tesela de 1 km² dentro de Ávila y contiene también una provincia adicional para demostrar que
+la jerarquía cambia por datos, no por funciones `process_avila`. El flujo es incremental e
+idempotente: un nuevo producto vigente invalida el anterior de la misma capa/AOI mediante
+`invalidated_at` y `superseded_by`; no lo borra.
+
+El backend actual de storage es `LocalStorage`, confinado a `GEOSPATIAL_STORAGE_ROOT`. Su contrato
+permite sustituirlo por object storage. Las URI firmadas de proveedores nunca se guardan en
+manifiestos ni provenance.
 
 ## Escalado
 

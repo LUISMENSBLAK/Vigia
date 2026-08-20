@@ -193,3 +193,87 @@ class EumetsatClient:
                 f"EUMETSAT {operation} devolvió un payload inválido."
             )
         return payload
+
+
+class EumetsatDiscoveryClient:
+    """Anonymous catalogue access; product download still requires OAuth."""
+
+    def __init__(
+        self,
+        *,
+        base_url: str = "https://api.eumetsat.int",
+        timeout_seconds: float = 45.0,
+        transport: httpx.AsyncBaseTransport | None = None,
+    ) -> None:
+        self._base_url = base_url.rstrip("/")
+        self._timeout = timeout_seconds
+        self._transport = transport
+
+    async def collection_metadata(self, collection_id: str) -> dict[str, Any]:
+        payload = await self._get_json(
+            f"{self._base_url}/data/browse/1.0.0/collections/{quote(collection_id, safe='')}",
+            params={"format": "json"},
+            operation="catálogo anónimo",
+        )
+        collection = payload.get("collection")
+        if not isinstance(collection, dict):
+            raise EumetsatPayloadError("EUMETSAT no devolvió metadata de colección válida.")
+        return collection
+
+    async def search_products(
+        self,
+        collection_id: str,
+        *,
+        start: datetime,
+        end: datetime,
+        limit: int = 5,
+    ) -> dict[str, Any]:
+        if start.tzinfo is None or end.tzinfo is None or end <= start:
+            raise ValueError("La ventana temporal debe ser válida y contener zona horaria.")
+        if not 1 <= limit <= 100:
+            raise ValueError("limit debe estar entre 1 y 100.")
+        payload = await self._get_json(
+            f"{self._base_url}/data/search-products/1.0.0/os",
+            params={
+                "format": "json",
+                "pi": collection_id,
+                "si": 0,
+                "c": limit,
+                "dtstart": start.isoformat(),
+                "dtend": end.isoformat(),
+            },
+            operation="búsqueda anónima",
+        )
+        if not isinstance(payload.get("features"), list) or not isinstance(
+            payload.get("totalResults"), int
+        ):
+            raise EumetsatPayloadError("EUMETSAT devolvió resultados de búsqueda inválidos.")
+        return payload
+
+    async def _get_json(
+        self,
+        url: str,
+        *,
+        params: dict[str, str | int | float | bool | None],
+        operation: str,
+    ) -> dict[str, Any]:
+        try:
+            async with httpx.AsyncClient(
+                timeout=self._timeout,
+                transport=self._transport,
+                follow_redirects=False,
+            ) as client:
+                response = await client.get(
+                    url, params=params, headers={"Accept": "application/json"}
+                )
+            response.raise_for_status()
+            payload = response.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            raise EumetsatHTTPError(
+                f"No se pudo completar EUMETSAT ({operation})."
+            ) from exc
+        if not isinstance(payload, dict):
+            raise EumetsatPayloadError(
+                f"EUMETSAT {operation} devolvió un payload inválido."
+            )
+        return payload

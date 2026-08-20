@@ -12,6 +12,11 @@ Las pruebas de procesamiento deben ser pequeñas. Descargar o procesar España c
 petición está prohibido. Los artefactos aceptados se convierten a COG cuando procede y conservan
 metadatos científicos y hashes.
 
+El materializador solicita la AOI en EPSG:32630 a 10 m, impone un máximo de píxeles y selecciona la
+escena L2A más reciente dentro de la ventana configurada con cloud cover de catálogo ≤30 %. Guarda
+por separado el stack fuente y el stack de índices, y publica NDVI, NDMI y NBR solo después de
+validar CRS, nodata, dimensiones, resolución y estructura COG.
+
 ## Sentinel-1
 
 Fase 4 prepara catálogo, selección por AOI, metadata, temporalidad, footprint, polarización y
