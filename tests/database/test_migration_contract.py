@@ -2,6 +2,7 @@ from pathlib import Path
 
 MIGRATION = Path("database/migrations/20260816000000_initial_vigia.sql")
 PHASE3_MIGRATION = Path("database/migrations/20260820000000_phase3_fusion.sql")
+PHASE4_MIGRATION = Path("database/migrations/20260820010000_phase4_geospatial.sql")
 
 
 def migration_sql() -> str:
@@ -10,6 +11,10 @@ def migration_sql() -> str:
 
 def phase3_sql() -> str:
     return PHASE3_MIGRATION.read_text(encoding="utf-8").casefold()
+
+
+def phase4_sql() -> str:
+    return PHASE4_MIGRATION.read_text(encoding="utf-8").casefold()
 
 
 def test_migration_keeps_private_and_api_schemas() -> None:
@@ -108,3 +113,49 @@ def test_phase3_internal_tables_are_forced_behind_rls() -> None:
         assert f"alter table vigia.{table} enable row level security" in sql
         assert f"alter table vigia.{table} force row level security" in sql
     assert "from public, anon, authenticated" in sql
+
+
+def test_phase4_catalogue_preserves_resolution_time_and_provenance() -> None:
+    sql = phase4_sql()
+    assert "create table vigia.geospatial_products" in sql
+    for field in (
+        "source_resolution_m",
+        "output_resolution_m",
+        "observed_at",
+        "processed_at",
+        "input_hashes",
+        "output_hash",
+        "configuration_hash",
+        "algorithm",
+        "provenance_id",
+    ):
+        assert field in sql
+    assert "availability <> 'available'" in sql
+
+
+def test_phase4_supports_national_administration_without_seeded_boundaries() -> None:
+    sql = phase4_sql()
+    assert "create table vigia.administrative_areas" in sql
+    for level in ("country", "autonomous_community", "province", "municipality"):
+        assert f"'{level}'" in sql
+    assert "insert into vigia.administrative_areas" not in sql
+
+
+def test_phase4_manifest_is_idempotent_and_never_stores_tokens() -> None:
+    sql = phase4_sql()
+    assert "create table vigia.download_manifests" in sql
+    assert "unique (source_id, product_id, aoi_hash)" in sql
+    assert "checksum_sha256" in sql
+    assert "token" not in sql
+
+
+def test_phase4_private_tables_force_rls() -> None:
+    sql = phase4_sql()
+    for table in (
+        "administrative_areas",
+        "geospatial_products",
+        "download_manifests",
+        "geospatial_processing_runs",
+    ):
+        assert f"alter table vigia.{table} enable row level security" in sql
+        assert f"alter table vigia.{table} force row level security" in sql

@@ -170,13 +170,17 @@ SENTINEL_COLLECTIONS = {
 SENTINEL_2_INDEX_EVALSCRIPT = """//VERSION=3
 function setup() {
   return {
-    input: ["B04", "B08", "B11", "B12", "dataMask"],
+    input: ["B04", "B08", "B11", "B12", "SCL", "dataMask"],
     output: { bands: 4, sampleType: "FLOAT32" }
   };
 }
 function ratio(a, b) { return (a + b) === 0 ? NaN : (a - b) / (a + b); }
+function valid(s) {
+  return s.dataMask === 1 && ![0, 1, 3, 8, 9, 10, 11].includes(s.SCL);
+}
 function evaluatePixel(s) {
-  return [ratio(s.B08, s.B04), ratio(s.B08, s.B11), ratio(s.B08, s.B12), s.dataMask];
+  if (!valid(s)) return [NaN, NaN, NaN, 0];
+  return [ratio(s.B08, s.B04), ratio(s.B08, s.B11), ratio(s.B08, s.B12), 1];
 }
 """
 
@@ -205,6 +209,7 @@ def sentinel_2_index_request(
                     "dataFilter": {
                         "timeRange": {"from": start.isoformat(), "to": end.isoformat()},
                         "mosaickingOrder": "leastCC",
+                        "maxCloudCoverage": 30,
                     },
                 }
             ],

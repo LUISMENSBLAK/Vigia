@@ -17,12 +17,14 @@ import {
   loadIncidents,
   unavailableIncidents,
 } from "@/lib/incidents";
+import { layerAvailability, loadGeospatialLayers } from "@/lib/geospatial";
 import type {
   FireObservationCollection,
   FireObservationFeature,
   IncidentCollection,
   IncidentDetail,
   IncidentFeature,
+  GeospatialLayerStatus,
 } from "@/lib/types";
 
 import { IncidentDetailPanel } from "./incident-detail";
@@ -40,11 +42,31 @@ const inactiveLayers = [
   "Meteorología",
   "Viento",
   "Humedad",
-  "Vegetación",
   "Combustible",
   "LiDAR",
-  "Topografía",
   "Histórico",
+];
+
+const geospatialLayers = [
+  { label: "Terrain", codes: ["ELEVATION", "SLOPE", "ASPECT", "TERRAIN_RUGGEDNESS"] },
+  { label: "Vegetation", codes: ["NDVI", "NDMI", "NBR"] },
+  { label: "Land Cover", codes: ["LAND_COVER"] },
+  {
+    label: "Cobertura de datos",
+    codes: [
+      "ELEVATION",
+      "SLOPE",
+      "ASPECT",
+      "TERRAIN_RUGGEDNESS",
+      "NDVI",
+      "NDMI",
+      "NBR",
+      "LAND_COVER",
+      "LIDAR_DTM",
+      "LIDAR_DSM",
+      "CANOPY_HEIGHT",
+    ],
+  },
 ];
 
 function valueOrNoData(value: string | number | null, suffix = ""): string {
@@ -94,6 +116,8 @@ export function MapWorkspace() {
   const [incidentsLoading, setIncidentsLoading] = useState(true);
   const [showObservations, setShowObservations] = useState(true);
   const [showIncidents, setShowIncidents] = useState(true);
+  const [geospatialStatus, setGeospatialStatus] = useState<GeospatialLayerStatus[]>([]);
+  const [geospatialLoading, setGeospatialLoading] = useState(true);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -106,6 +130,19 @@ export function MapWorkspace() {
       })
       .finally(() => {
         if (!controller.signal.aborted) setObservationsLoading(false);
+      });
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    loadGeospatialLayers(controller.signal)
+      .then(setGeospatialStatus)
+      .catch(() => {
+        if (!controller.signal.aborted) setGeospatialStatus([]);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setGeospatialLoading(false);
       });
     return () => controller.abort();
   }, []);
@@ -181,6 +218,18 @@ export function MapWorkspace() {
             <span>Incidentes derivados</span>
             <small>{incidentsLoading ? "Verificando" : incidents.metadata.count}</small>
           </label>
+          {geospatialLayers.map((layer) => {
+            const availability = geospatialLoading
+              ? "VERIFICANDO"
+              : layerAvailability(geospatialStatus, layer.codes);
+            return (
+              <label key={layer.label}>
+                <input type="checkbox" disabled />
+                <span>{layer.label}</span>
+                <small>{availability}</small>
+              </label>
+            );
+          })}
           {inactiveLayers.map((layer) => (
             <label key={layer}>
               <input type="checkbox" disabled />

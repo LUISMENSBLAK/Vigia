@@ -74,3 +74,5 @@ def test_sentinel_index_request_uses_aoi_window_and_no_full_scene() -> None:
     assert "B08" in request["evalscript"]
     assert "B11" in request["evalscript"]
     assert "B12" in request["evalscript"]
+    assert "SCL" in request["evalscript"]
+    assert request["input"]["data"][0]["dataFilter"]["maxCloudCoverage"] == 30

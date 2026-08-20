@@ -52,7 +52,9 @@ class VigiaDatabase:
     async def health(self) -> DatabaseHealth:
         try:
             async with self._engine.connect() as connection:
-                postgis_version = await connection.scalar(text("select postgis_version()"))
+                postgis_version = await connection.scalar(
+                    text("select extensions.postgis_version()")
+                )
         except (SQLAlchemyError, OSError) as exc:
             raise DatabaseUnavailableError("No se pudo verificar Supabase/PostGIS.") from exc
         if not isinstance(postgis_version, str):
@@ -265,6 +267,112 @@ class VigiaDatabase:
             statement,
             {"incident_id": incident_id},
             "No se pudo consultar el historial del incidente.",
+        )
+
+    async def geospatial_layers(self) -> list[dict[str, Any]]:
+        return await self._mapped_query(
+            text(
+                """
+                select layer, availability::text, count(*)::integer as product_count,
+                  max(observed_at) as latest_observed_at,
+                  min(output_resolution_m) as finest_resolution_m
+                from vigia.geospatial_products
+                group by layer, availability
+                order by layer, availability
+                """
+            ),
+            {},
+            "No se pudo consultar el catálogo geoespacial.",
+        )
+
+    async def geospatial_coverage(
+        self,
+        *,
+        bbox: tuple[float, float, float, float] | None,
+        geometry_geojson: str | None,
+        administrative_area: str | None,
+        as_of: datetime,
+        limit: int = 1000,
+    ) -> list[dict[str, Any]]:
+        west, south, east, north = bbox or (None, None, None, None)
+        selector = "bbox" if bbox is not None else "geojson" if geometry_geojson else "admin"
+        return await self._mapped_query(
+            text(
+                """
+                with query_aoi as (
+                  select case
+                    when :selector = 'bbox' then extensions.st_makeenvelope(
+                      :west, :south, :east, :north, 4326
+                    )
+                    when :selector = 'geojson' then extensions.st_setsrid(
+                      extensions.st_geomfromgeojson(:geometry_geojson), 4326
+                    )
+                    else (
+                      select area.geometry::extensions.geometry
+                      from vigia.administrative_areas area
+                      where area.external_id = :administrative_area
+                         or lower(area.name) = lower(:administrative_area)
+                      order by area.dataset_version desc, area.external_id
+                      limit 1
+                    )
+                  end as geometry
+                )
+                select product.id::text, product.product_id, product.layer,
+                  product.availability::text, product.observed_at,
+                  product.output_resolution_m, source.name as source,
+                  product.quality, product.is_experimental,
+                  extensions.st_asgeojson(product.footprint)::jsonb as geometry
+                from vigia.geospatial_products product
+                join vigia.sources source on source.id = product.source_id
+                cross join query_aoi
+                where query_aoi.geometry is not null
+                  and extensions.st_intersects(product.footprint, query_aoi.geometry)
+                  and (product.observed_at is null or product.observed_at <= :as_of)
+                  and (product.processed_at is null or product.processed_at <= :as_of)
+                order by product.observed_at desc nulls last, product.product_id
+                limit :limit
+                """
+            ),
+            {
+                "west": west,
+                "south": south,
+                "east": east,
+                "north": north,
+                "selector": selector,
+                "geometry_geojson": geometry_geojson,
+                "administrative_area": administrative_area,
+                "as_of": as_of,
+                "limit": limit,
+            },
+            "No se pudo consultar la cobertura geoespacial.",
+        )
+
+    async def geospatial_context(
+        self, *, longitude: float, latitude: float, as_of: datetime
+    ) -> list[dict[str, Any]]:
+        return await self._mapped_query(
+            text(
+                """
+                select distinct on (product.layer)
+                  product.id::text, product.product_id, product.layer,
+                  product.availability::text, product.observed_at, product.processed_at,
+                  product.output_resolution_m, product.quality, product.provenance_id::text,
+                  source.name as source
+                from vigia.geospatial_products product
+                join vigia.sources source on source.id = product.source_id
+                where extensions.st_covers(
+                  product.footprint,
+                  extensions.st_setsrid(
+                    extensions.st_makepoint(:longitude, :latitude), 4326
+                  )
+                )
+                  and (product.observed_at is null or product.observed_at <= :as_of)
+                  and (product.processed_at is null or product.processed_at <= :as_of)
+                order by product.layer, product.observed_at desc nulls last
+                """
+            ),
+            {"longitude": longitude, "latitude": latitude, "as_of": as_of},
+            "No se pudo consultar el contexto geoespacial.",
         )
 
     async def _mapped_query(

@@ -108,3 +108,20 @@ export interface IncidentDetail {
   rule_version: string | null;
   configuration_hash: string | null;
 }
+
+export type GeospatialAvailability =
+  | "AVAILABLE"
+  | "PARTIAL"
+  | "STALE"
+  | "UNAVAILABLE"
+  | "PROCESSING"
+  | "ERROR";
+
+export interface GeospatialLayerStatus {
+  layer: string;
+  availability: GeospatialAvailability;
+  product_count: number;
+  latest_observed_at: string | null;
+  finest_resolution_m: number | null;
+  message: string;
+}

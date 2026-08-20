@@ -8,9 +8,9 @@ incertidumbre explícitas. España es el ámbito inicial; Ávila y Castilla y Le
 zonas de investigación de alta resolución. El diseño evita hardcodear una región única y puede
 evolucionar hacia cobertura europea.
 
-> Estado: fase 1 ampliada con persistencia y superficies live preparadas. No es un sistema
-> operativo de emergencias. No contiene incendios, métricas, riesgo ni predicciones simuladas.
-> Sin credenciales y una ejecución remota verificada, todas las fuentes permanecen `SIN_DATOS`.
+> Estado: Fase 4 geoespacial en foundation. No es un sistema operativo de emergencias. Los hotspots
+> son observaciones, no incendios; los incidentes derivados no se confirman automáticamente. La
+> disponibilidad de cada fuente o capa depende de una comprobación fechada y persistida.
 
 ## Arquitectura
 
@@ -22,8 +22,8 @@ workers/aemet         AEMET observado, normalización y persistencia separada
 workers/copernicus    OAuth2 cacheado, Catalog y requests Sentinel-2 por AOI
 database/migrations   PostGIS, esquemas privados, RLS e índices espaciales
 vigia_ai              Fusión/detección research y contratos científicos por motor
+vigia_geospatial       AOI nacional, raster/COG, terreno, vegetación, LiDAR y storage
 config                 Parámetros versionados del baseline de fusión
-gis                    Pipelines raster/LiDAR/terrain (siguientes fases)
 docs                   Decisiones auditables y metodología
 tests                  API, workers y pruebas científicas deterministas
 ```
@@ -80,7 +80,9 @@ La migración `20260820000000_phase3_fusion.sql` añade runs, candidatos, asocia
 contextos vacíos de fuentes térmicas/quemadas, todos internos y con RLS forzado. Ninguna migración
 se considera aplicada remotamente sin verificación real.
 
-No se ha aplicado a un proyecto remoto. Antes de hacerlo:
+La migración `20260820010000_phase4_geospatial.sql` añade unidades administrativas oficiales,
+catálogo de productos geoespaciales, manifests y runs por AOI. Los raster permanecen fuera de
+PostgreSQL. Antes de aplicar cualquier migración en otro entorno:
 
 1. revisar la migración en una rama;
 2. ejecutar en una base desechable;
@@ -98,9 +100,10 @@ clave determinista, evita duplicados y crea provenance con hashes. No se interpr
 como un incendio independiente; el clustering permanece bloqueado hasta disponer de observaciones
 reales verificadas.
 
-El baseline de Fase 3 ya puede agrupar observaciones persistidas de forma determinista, pero todavía
-no se ha ejecutado contra una muestra PostGIS real. Los tests sintéticos validan ingeniería, no
-precisión científica.
+El 20 de agosto de 2026 se verificó una ejecución LIVE contra PostGIS remoto: 391 observaciones
+FIRMS reales persistidas produjeron 43 clusters y 31 incidentes derivados; ninguno quedó
+`INCENDIO_CONFIRMADO`. Es una comprobación de integración, no una validación de precisión
+científica ni un inventario de incendios.
 
 Ejecución, únicamente después de aplicar y verificar la base y configurar `.env`:
 
@@ -115,6 +118,10 @@ de detalle/evidence/history exponen únicamente incidentes públicos derivados. 
 de observaciones e incidentes y ofrece listas textuales completas. `/v1/status` y `/estado`
 obtienen PostGIS, salud de fuentes y última ejecución de workers; una credencial por sí sola nunca
 produce `OPERATIVO`.
+
+Fase 4 añade `/api/geospatial/layers`, `/api/geospatial/coverage` y
+`/api/geospatial/context`. El catálogo conserva fecha, resolución, calidad, cobertura y provenance;
+un valor raster inexistente responde `NO DISPONIBLE`.
 
 ## Comprobaciones
 
@@ -151,7 +158,14 @@ uv run python -m vigia_ai.fusion --from 2026-08-20T00:00:00Z \
 - [Seguridad](docs/security.md)
 - [Cumplimiento europeo](docs/eu-compliance.md)
 - [Procedencia](docs/data-provenance.md)
+- [Arquitectura geoespacial](docs/geospatial-architecture.md)
+- [Terreno](docs/terrain.md)
+- [Vegetación](docs/vegetation.md)
+- [LiDAR PNOA](docs/lidar-pnoa.md)
+- [Sentinel](docs/sentinel.md)
+- [Replay](docs/replay.md)
 - [Fusion Engine](docs/fusion-engine.md)
 - [Detection Engine](docs/detection-engine.md)
 - [Despliegue](docs/deployment.md)
 - [Auditoría LIVE 2026-08-16](docs/live-integration-audit-2026-08-16.md)
+- [Auditoría LIVE 2026-08-20](docs/live-integration-audit-2026-08-20.md)

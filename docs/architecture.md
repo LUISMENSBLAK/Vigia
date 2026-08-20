@@ -29,9 +29,11 @@ y cubiertos por pruebas sin secretos. Copernicus dispone de autenticación cache
 request acotado de índices Sentinel-2. Ninguna de estas piezas equivale a una integración remota
 verificada.
 
-La aplicación remota de PostGIS, los tests de roles, advisors, FIRMS LIVE y la primera persistencia
-permanecen bloqueados por ausencia del proyecto/credenciales VIGÍA. EUMETSAT netCDF, clustering y
-Confidence no cruzarán su puerta hasta disponer de evidencia real suficiente.
+El 20 de agosto de 2026 se verificaron PostGIS remoto, tablas, constraints, RLS/grants backend,
+persistencia FIRMS/AEMET, OAuth/Catalog/Process de Copernicus y una ejecución real de Fusión. Los
+advisors de Supabase no se ejecutaron y permanecen `NO VERIFICADO`. EUMETSAT rechazó OAuth; catálogo,
+producto y netCDF siguen `NO VERIFICADO`. Confidence no cruzará su puerta hasta disponer de
+evidencia real suficiente y calibración.
 
 ## Fase 3: fusión y detección
 
@@ -40,3 +42,11 @@ estado. Fusion es determinista, configurable y compatible con `as_of`; Detection
 máquina de estados sin confirmación automática. FastAPI expone solo incidentes `public_visible` y
 evidencia sanitizada. Las tablas de runs, candidatos y contexto permanecen internas con RLS
 forzado. Ver `docs/fusion-engine.md` y `docs/detection-engine.md`.
+
+## Fase 4: base física nacional
+
+`vigia_geospatial` separa catálogo, AOI, almacenamiento, validación raster/COG, terreno, vegetación
+y LiDAR. PostGIS guarda footprints, estados, jerarquía administrativa y provenance; los artefactos
+se guardan mediante una interfaz local sustituible por object storage. Las consultas por punto y
+cobertura aceptan `as_of` y excluyen adquisiciones o procesamientos futuros. Ver
+`docs/geospatial-architecture.md`.

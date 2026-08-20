@@ -149,6 +149,38 @@ class IncidentHistoryEntry(BaseModel):
     commit_sha: str | None = None
 
 
+class GeospatialLayerStatus(BaseModel):
+    layer: str
+    availability: str
+    product_count: int = Field(ge=0)
+    latest_observed_at: datetime | None = None
+    finest_resolution_m: float | None = None
+    message: str
+
+
+class GeospatialCoverageFeature(BaseModel):
+    type: Literal["Feature"] = "Feature"
+    geometry: dict[str, Any]
+    properties: dict[str, Any]
+
+
+class GeospatialCoverageCollection(BaseModel):
+    type: Literal["FeatureCollection"] = "FeatureCollection"
+    features: list[GeospatialCoverageFeature]
+    as_of: datetime
+
+
+class GeospatialContextResponse(BaseModel):
+    longitude: float
+    latitude: float
+    as_of: datetime
+    terrain: dict[str, Any]
+    vegetation: dict[str, Any]
+    land_cover: dict[str, Any]
+    lidar: dict[str, Any]
+    provenance: list[dict[str, Any]]
+
+
 def current_status(
     *,
     live_enabled: bool,

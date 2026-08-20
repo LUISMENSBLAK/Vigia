@@ -225,3 +225,106 @@ async def test_incident_detail_evidence_and_history_are_structured(
     assert "calibrated_probability" not in detail
     assert evidence[0]["role"] == "confirming"
     assert history[0]["previous_state"] == "VIGILANCIA"
+
+
+class GeospatialDatabase(FakeDatabase):
+    async def geospatial_layers(self) -> list[dict[str, object]]:
+        return [
+            {
+                "layer": "NDVI",
+                "availability": "PARTIAL",
+                "product_count": 1,
+                "latest_observed_at": datetime(2026, 8, 19, 10, tzinfo=UTC),
+                "finest_resolution_m": 10.0,
+            }
+        ]
+
+    async def geospatial_coverage(
+        self,
+        *,
+        bbox: tuple[float, float, float, float] | None,
+        geometry_geojson: str | None,
+        administrative_area: str | None,
+        as_of: datetime,
+        limit: int,
+    ) -> list[dict[str, object]]:
+        assert bbox == (-4.8, 40.6, -4.6, 40.8)
+        assert geometry_geojson is None
+        assert administrative_area is None
+        assert as_of == datetime(2026, 8, 20, 12, tzinfo=UTC)
+        assert limit == 10
+        return [
+            {
+                "id": "product-row",
+                "product_id": "real-product-id",
+                "layer": "NDVI",
+                "availability": "PARTIAL",
+                "observed_at": datetime(2026, 8, 19, 10, tzinfo=UTC),
+                "output_resolution_m": 10.0,
+                "source": "Copernicus Sentinel-2",
+                "quality": {"cloud_mask": "SCL"},
+                "is_experimental": False,
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [
+                        [
+                            [-4.8, 40.6],
+                            [-4.6, 40.6],
+                            [-4.6, 40.8],
+                            [-4.8, 40.8],
+                            [-4.8, 40.6],
+                        ]
+                    ],
+                },
+            }
+        ]
+
+    async def geospatial_context(
+        self, *, longitude: float, latitude: float, as_of: datetime
+    ) -> list[dict[str, object]]:
+        assert (longitude, latitude) == (-4.7, 40.7)
+        assert as_of == datetime(2026, 8, 20, 12, tzinfo=UTC)
+        return [
+            {
+                "id": "product-row",
+                "product_id": "real-product-id",
+                "layer": "NDVI",
+                "availability": "PARTIAL",
+                "observed_at": datetime(2026, 8, 19, 10, tzinfo=UTC),
+                "processed_at": datetime(2026, 8, 19, 11, tzinfo=UTC),
+                "output_resolution_m": 10.0,
+                "quality": {"cloud_mask": "SCL"},
+                "provenance_id": "provenance-id",
+                "source": "Copernicus Sentinel-2",
+            }
+        ]
+
+
+async def test_geospatial_api_exposes_layers_coverage_and_honest_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(main, "database", GeospatialDatabase())
+    cutoff = "2026-08-20T12:00:00Z"
+
+    layers = (await request("/api/geospatial/layers")).json()
+    coverage = (
+        await request(
+            "/api/geospatial/coverage?west=-4.8&south=40.6&east=-4.6&north=40.8"
+            f"&as_of={cutoff}&limit=10"
+        )
+    ).json()
+    context = (await request(f"/api/geospatial/context?lat=40.7&lon=-4.7&as_of={cutoff}")).json()
+
+    assert layers[0]["availability"] == "PARTIAL"
+    assert coverage["features"][0]["properties"]["output_resolution_m"] == 10.0
+    assert context["vegetation"]["ndvi"]["value"] is None
+    assert context["vegetation"]["ndvi"]["message"].startswith("NO DISPONIBLE")
+    assert context["terrain"]["availability"] == "UNAVAILABLE"
+
+
+async def test_geospatial_coverage_rejects_oversized_aoi(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(main, "database", GeospatialDatabase())
+    response = await request("/api/geospatial/coverage?west=-10&south=35&east=5&north=44")
+    assert response.status_code == 422

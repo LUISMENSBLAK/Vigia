@@ -1,3 +1,4 @@
+import json
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
@@ -8,6 +9,8 @@ import structlog
 from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
+from vigia_geospatial.aoi import AOIRequest, resolve_inline_aoi
+
 from .config import get_settings
 from .database import DatabaseUnavailableError, VigiaDatabase
 from .logging import configure_logging
@@ -17,6 +20,10 @@ from .models import (
     FireObservationMetadata,
     FireObservationProperties,
     GeometryPoint,
+    GeospatialContextResponse,
+    GeospatialCoverageCollection,
+    GeospatialCoverageFeature,
+    GeospatialLayerStatus,
     IncidentCollection,
     IncidentCollectionMetadata,
     IncidentDetail,
@@ -464,3 +471,152 @@ async def incident_history(incident_id: UUID) -> list[IncidentHistoryEntry]:
         )
         for row in rows
     ]
+
+
+@app.get(
+    "/api/geospatial/layers",
+    response_model=list[GeospatialLayerStatus],
+    tags=["geospatial"],
+)
+async def geospatial_layers() -> list[GeospatialLayerStatus]:
+    try:
+        rows = await _require_database().geospatial_layers()
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc
+    return [
+        GeospatialLayerStatus(
+            **row,
+            message=(
+                "Metadata de capa disponible; consulte cobertura y fecha."
+                if row["availability"] in {"AVAILABLE", "PARTIAL"}
+                else "Capa sin producto utilizable para la consulta."
+            ),
+        )
+        for row in rows
+    ]
+
+
+@app.get(
+    "/api/geospatial/coverage",
+    response_model=GeospatialCoverageCollection,
+    tags=["geospatial"],
+)
+async def geospatial_coverage(
+    west: float | None = Query(default=None, ge=-180, le=180),
+    south: float | None = Query(default=None, ge=-90, le=90),
+    east: float | None = Query(default=None, ge=-180, le=180),
+    north: float | None = Query(default=None, ge=-90, le=90),
+    geojson: str | None = Query(default=None, max_length=20_000),
+    administrative_area: str | None = Query(default=None, min_length=1, max_length=160),
+    as_of: datetime | None = None,
+    limit: int = Query(default=1000, ge=1, le=5000),
+) -> GeospatialCoverageCollection:
+    cutoff = as_of or datetime.now(UTC)
+    bbox_items = (west, south, east, north)
+    has_any_bbox = any(item is not None for item in bbox_items)
+    has_complete_bbox = all(item is not None for item in bbox_items)
+    if has_any_bbox and not has_complete_bbox:
+        raise HTTPException(status_code=422, detail="bbox requiere west, south, east y north.")
+    selector_count = sum((has_complete_bbox, geojson is not None, administrative_area is not None))
+    if selector_count != 1:
+        raise HTTPException(status_code=422, detail="Seleccione exactamente una AOI.")
+    bbox: tuple[float, float, float, float] | None = None
+    geometry_geojson: str | None = None
+    try:
+        if has_complete_bbox:
+            assert west is not None and south is not None and east is not None and north is not None
+            bbox = (west, south, east, north)
+            resolve_inline_aoi(AOIRequest(bbox=bbox))
+        elif geojson is not None:
+            parsed_geojson = json.loads(geojson)
+            if not isinstance(parsed_geojson, dict):
+                raise ValueError("GeoJSON debe ser un objeto.")
+            resolved = resolve_inline_aoi(AOIRequest(geojson=parsed_geojson))
+            geometry_geojson = json.dumps(resolved.geojson, separators=(",", ":"))
+        else:
+            AOIRequest(administrative_area=administrative_area)
+    except (ValueError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    try:
+        rows = await _require_database().geospatial_coverage(
+            bbox=bbox,
+            geometry_geojson=geometry_geojson,
+            administrative_area=administrative_area,
+            as_of=cutoff,
+            limit=limit,
+        )
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc
+    return GeospatialCoverageCollection(
+        as_of=cutoff,
+        features=[
+            GeospatialCoverageFeature(
+                geometry=row.pop("geometry"),
+                properties=row,
+            )
+            for row in rows
+        ],
+    )
+
+
+@app.get(
+    "/api/geospatial/context",
+    response_model=GeospatialContextResponse,
+    tags=["geospatial"],
+)
+async def geospatial_context(
+    lat: float = Query(ge=-90, le=90),
+    lon: float = Query(ge=-180, le=180),
+    as_of: datetime | None = None,
+) -> GeospatialContextResponse:
+    cutoff = as_of or datetime.now(UTC)
+    try:
+        rows = await _require_database().geospatial_context(
+            longitude=lon, latitude=lat, as_of=cutoff
+        )
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc
+    categories: dict[str, dict[str, Any]] = {
+        "terrain": {},
+        "vegetation": {},
+        "land_cover": {},
+        "lidar": {},
+    }
+    provenance: list[dict[str, Any]] = []
+    terrain_layers = {"ELEVATION", "SLOPE", "ASPECT", "TERRAIN_RUGGEDNESS"}
+    vegetation_layers = {"NDVI", "NDMI", "NBR", "FUEL_PROXY"}
+    lidar_layers = {"LIDAR_DTM", "LIDAR_DSM", "CANOPY_HEIGHT"}
+    for row in rows:
+        layer = row["layer"]
+        if layer in terrain_layers:
+            context_category = "terrain"
+        elif layer in vegetation_layers:
+            context_category = "vegetation"
+        elif layer in lidar_layers:
+            context_category = "lidar"
+        else:
+            context_category = "land_cover"
+        categories[context_category][layer.casefold()] = {
+            "value": None,
+            "message": (
+                "NO DISPONIBLE: el catálogo cubre el punto, pero no hay lectura píxel publicada."
+            ),
+            "availability": row["availability"],
+            "observed_at": row["observed_at"],
+            "processed_at": row["processed_at"],
+            "resolution_m": row["output_resolution_m"],
+            "source": row["source"],
+            "product_id": row["product_id"],
+            "quality": row["quality"],
+        }
+        provenance.append({"product_id": row["product_id"], "provenance_id": row["provenance_id"]})
+    for category_payload in categories.values():
+        if not category_payload:
+            category_payload.update({"availability": "UNAVAILABLE", "message": "NO DISPONIBLE"})
+    return GeospatialContextResponse(
+        longitude=lon,
+        latitude=lat,
+        as_of=cutoff,
+        provenance=provenance,
+        **categories,
+    )

@@ -64,6 +64,25 @@ async def test_rejects_untrusted_data_url() -> None:
         await client.fetch_observations()
 
 
+async def test_accepts_official_iso_8859_1_payload() -> None:
+    payload = """[{"idema":"2444","ubi":"ÁVILA","lat":40.65,"lon":-4.68,
+      "fint":"2026-08-16T12:00:00+00:00","ta":27.4}]""".encode("iso-8859-1")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/todas"):
+            return httpx.Response(
+                200,
+                json={"estado": 200, "datos": "https://opendata.aemet.es/data"},
+            )
+        return httpx.Response(200, content=payload, headers={"content-type": "text/plain"})
+
+    observations = await AemetClient(
+        "test-key", transport=httpx.MockTransport(handler)
+    ).fetch_observations()
+    assert len(observations) == 1
+    assert observations[0].station_name == "ÁVILA"
+
+
 class RecordingConnection:
     def __init__(self) -> None:
         self.parameters: list[dict[str, Any]] = []

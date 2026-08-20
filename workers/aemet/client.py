@@ -1,4 +1,5 @@
 import hashlib
+import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -161,6 +162,11 @@ class AemetClient:
             raise AemetHTTPError("No se pudo completar la llamada a AEMET.") from exc
         try:
             payload = response.json()
-        except ValueError as exc:
-            raise AemetPayloadError("AEMET devolvió datos que no son JSON válido.") from exc
+        except ValueError:
+            try:
+                payload = json.loads(response.content.decode("iso-8859-1"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as fallback_exc:
+                raise AemetPayloadError(
+                    "AEMET devolvió datos que no son JSON válido."
+                ) from fallback_exc
         return parse_aemet_observations(payload, received_at=datetime.now(UTC))

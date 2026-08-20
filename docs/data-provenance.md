@@ -23,3 +23,13 @@ Cada ejecución de fusión conserva `as_of`, rango observado, configuración can
 commit, familias, conteos y candidatos. Las asociaciones son idempotentes. Cada transición de
 incidente conserva estado anterior/nuevo, reason codes, snapshot de observaciones, run, regla,
 software, commit y configuration hash; el historial no se sobrescribe.
+
+Fase 4 añade un catálogo raster/LiDAR que conserva proveedor, dataset, product id, ficheros o ids de
+entrada, hashes de entrada, versión de procesamiento, configuration hash, software, timestamps,
+CRS de entrada/salida, resolución de entrada/salida, remuestreo, algoritmo, footprint, calidad,
+storage URI y output hash. `download_manifests` registra solicitud, finalización, tamaño, checksum,
+ETag, estado y hash de AOI, pero nunca tokens.
+
+`AVAILABLE` requiere un artefacto local/objeto y hash verificables. Un registro de catálogo o una
+respuesta HTTP correcta no basta para declarar una capa disponible. El `as_of` de API y Replay
+filtra tanto adquisición como procesamiento para impedir future leakage.
