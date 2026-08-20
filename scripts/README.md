@@ -6,12 +6,18 @@
   la denegación de observaciones internas para `anon` y `authenticated`.
 - `apply_phase3_migration.py` aplica las tablas internas de fusión, candidatos, contexto térmico e
   historial únicamente cuando la migración inicial existe y Fase 3 todavía no está instalada.
+- `apply_phase5_migration.py` aplica una sola vez el contrato del motor nacional de riesgo.
+- `verify_phase5.py` comprueba tablas, columnas, constraints, índices, RLS y permisos remotos.
+- `run_phase5_risk.py` ejecuta una AOI configurable, impone el contrato temporal y persiste tanto
+  resultados numéricos como estados explícitos de datos insuficientes.
 
-Ambos leen `SUPABASE_DB_URL` desde `.env`, no imprimen la conexión y devuelven `SIN_DATOS` si falta.
+Los scripts remotos leen `SUPABASE_DB_URL` desde `.env` sin imprimir la conexión.
 Los advisors de Supabase se ejecutan por separado contra el proyecto remoto correcto.
 
 ```bash
 uv run python -m scripts.apply_migration
 uv run python -m scripts.apply_phase3_migration
+uv run python -m scripts.apply_phase5_migration
 uv run python -m scripts.verify_supabase
+uv run python -m scripts.verify_phase5
 ```

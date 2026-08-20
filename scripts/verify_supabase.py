@@ -69,8 +69,10 @@ async def verify() -> int:
         rls_missing = await connection.fetchval(
             """
             select count(*)
-            from pg_tables
-            where schemaname = 'vigia' and not (rowsecurity and forcerowsecurity)
+            from pg_class relation
+            join pg_namespace namespace on namespace.oid = relation.relnamespace
+            where namespace.nspname = 'vigia' and relation.relkind in ('r', 'p')
+              and not (relation.relrowsecurity and relation.relforcerowsecurity)
             """
         )
         checks.append(Check("RLS forzado", rls_missing == 0, f"tablas sin RLS: {rls_missing}"))

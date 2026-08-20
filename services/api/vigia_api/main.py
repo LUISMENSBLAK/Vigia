@@ -33,6 +33,9 @@ from .models import (
     IncidentFeature,
     IncidentHistoryEntry,
     IncidentProperties,
+    RiskAssessmentResponse,
+    RiskContextResponse,
+    RiskForecastResponse,
     SourceHealth,
     SourceState,
     SystemStatus,
@@ -591,9 +594,7 @@ async def geospatial_context(
     cutoff = as_of or datetime.now(UTC)
     try:
         active_database = _require_database()
-        rows = await active_database.geospatial_context(
-            longitude=lon, latitude=lat, as_of=cutoff
-        )
+        rows = await active_database.geospatial_context(longitude=lon, latitude=lat, as_of=cutoff)
         administration = await active_database.administrative_context(
             longitude=lon, latitude=lat, as_of=cutoff
         )
@@ -632,12 +633,7 @@ async def geospatial_context(
             "data_age_seconds": (
                 max(
                     0,
-                    int(
-                        (
-                            cutoff
-                            - (row["observed_at"] or row["processed_at"])
-                        ).total_seconds()
-                    ),
+                    int((cutoff - (row["observed_at"] or row["processed_at"])).total_seconds()),
                 )
                 if row["observed_at"] is not None or row["processed_at"] is not None
                 else None
@@ -703,3 +699,94 @@ async def geospatial_tile(product_id: UUID, z: int, x: int, y: int) -> Response:
         media_type="image/png",
         headers={"Cache-Control": "public, max-age=3600"},
     )
+
+
+def _risk_assessment(row: dict[str, Any]) -> RiskAssessmentResponse:
+    return RiskAssessmentResponse(**row)
+
+
+@app.get("/api/risk/current", response_model=RiskContextResponse, tags=["risk"])
+@app.get("/api/risk/context", response_model=RiskContextResponse, tags=["risk"])
+async def risk_current(
+    lat: float = Query(ge=-90, le=90),
+    lon: float = Query(ge=-180, le=180),
+    as_of: datetime | None = None,
+) -> RiskContextResponse:
+    cutoff = as_of or datetime.now(UTC)
+    try:
+        row = await _require_database().risk_current(longitude=lon, latitude=lat, as_of=cutoff)
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc
+    if row is None:
+        return RiskContextResponse(
+            availability="UNAVAILABLE",
+            longitude=lon,
+            latitude=lat,
+            requested_as_of=cutoff,
+            message="NO DISPONIBLE: no existe una ejecución válida para el punto y as_of.",
+        )
+    assessment = _risk_assessment(row)
+    return RiskContextResponse(
+        availability=(
+            "UNAVAILABLE"
+            if assessment.experimental_index is None
+            else "AVAILABLE"
+            if assessment.data_quality == "COMPLETE"
+            else "PARTIAL"
+        ),
+        longitude=lon,
+        latitude=lat,
+        requested_as_of=cutoff,
+        assessment=assessment,
+        message=(
+            "Índice ambiental experimental disponible con trazabilidad."
+            if assessment.experimental_index is not None
+            else "DATOS INSUFICIENTES: componentes críticos ausentes."
+        ),
+    )
+
+
+@app.get("/api/risk/forecast", response_model=RiskForecastResponse, tags=["risk"])
+async def risk_forecast(
+    lat: float = Query(ge=-90, le=90),
+    lon: float = Query(ge=-180, le=180),
+    as_of: datetime | None = None,
+    max_horizon_hours: int = Query(default=72, ge=1, le=240),
+) -> RiskForecastResponse:
+    cutoff = as_of or datetime.now(UTC)
+    try:
+        rows = await _require_database().risk_forecast(
+            longitude=lon,
+            latitude=lat,
+            as_of=cutoff,
+            max_horizon_hours=max_horizon_hours,
+        )
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc
+    forecasts = [_risk_assessment(row) for row in rows]
+    return RiskForecastResponse(
+        availability=(
+            "AVAILABLE"
+            if forecasts and all(item.data_quality == "COMPLETE" for item in forecasts)
+            else "PARTIAL"
+            if forecasts
+            else "UNAVAILABLE"
+        ),
+        longitude=lon,
+        latitude=lat,
+        requested_as_of=cutoff,
+        forecasts=forecasts,
+        message=(
+            "Horizontes experimentales disponibles; no son probabilidades de incendio."
+            if forecasts
+            else "NO DISPONIBLE: no hay horizontes reales persistidos."
+        ),
+    )
+
+
+@app.get("/api/risk/layers", response_model=list[dict[str, Any]], tags=["risk"])
+async def risk_layers() -> list[dict[str, Any]]:
+    try:
+        return await _require_database().risk_layers()
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc

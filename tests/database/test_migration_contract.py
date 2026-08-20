@@ -4,6 +4,7 @@ MIGRATION = Path("database/migrations/20260816000000_initial_vigia.sql")
 PHASE3_MIGRATION = Path("database/migrations/20260820000000_phase3_fusion.sql")
 PHASE4_MIGRATION = Path("database/migrations/20260820010000_phase4_geospatial.sql")
 PHASE4B_MIGRATION = Path("database/migrations/20260820020000_phase4b_real_geospatial.sql")
+PHASE5_MIGRATION = Path("database/migrations/20260820030000_phase5_national_risk.sql")
 
 
 def migration_sql() -> str:
@@ -20,6 +21,10 @@ def phase4_sql() -> str:
 
 def phase4b_sql() -> str:
     return PHASE4B_MIGRATION.read_text(encoding="utf-8").casefold()
+
+
+def phase5_sql() -> str:
+    return PHASE5_MIGRATION.read_text(encoding="utf-8").casefold()
 
 
 def test_migration_keeps_private_and_api_schemas() -> None:
@@ -187,3 +192,13 @@ def test_phase4b_land_cover_and_product_lifecycle_stay_private() -> None:
     assert "alter table vigia.land_cover_features force row level security" in sql
     for field in ("published_at", "invalidated_at", "superseded_by", "render_hint"):
         assert field in sql
+
+
+def test_phase5_risk_contract_is_non_probabilistic_and_temporal() -> None:
+    sql = phase5_sql()
+    assert "create table vigia.risk_runs" in sql
+    assert "experimental_index between 0 and 100" in sql
+    assert "create type vigia.risk_mode" in sql
+    assert "input_snapshot_hash" in sql
+    assert "force row level security" in sql
+    assert "risk_score double precision not null" not in sql

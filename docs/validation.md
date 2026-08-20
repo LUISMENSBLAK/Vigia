@@ -28,3 +28,14 @@ Las pruebas sintéticas validan geodistancia, ventanas, clustering, determinismo
 persistencia temporal, contradicciones, transiciones y no leakage con `as_of`. No validan precisión
 científica. Antes de calibrar deben prepararse positivos, negativos, fuentes térmicas recurrentes y
 separaciones espaciales/temporales reales. Ningún resultado sintético aparece en la API LIVE.
+
+## Fase 5
+
+La suite incluye referencia oficial FWI, estado encadenado, IDW/edad, future leakage,
+composición incompleta, rangos, alineación/resolución, nodata/COG, CRS nacionales,
+migración RLS y contratos API. La ejecución LIVE se registra por separado.
+
+En la validación final del `2026-08-20`: TypeScript, ESLint, Vitest (`12/12`), Next.js build,
+Ruff, mypy y Pytest (`104/104`) terminaron correctamente. Playwright quedó `BLOCKED`: Chromium
+estaba instalado, pero el sandbox del entorno denegó el registro del puerto Mach necesario para
+arrancarlo. No se clasifica como fallo funcional de VIGÍA.

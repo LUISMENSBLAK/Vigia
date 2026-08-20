@@ -50,3 +50,10 @@ y LiDAR. PostGIS guarda footprints, estados, jerarquía administrativa y provena
 se guardan mediante una interfaz local sustituible por object storage. Las consultas por punto y
 cobertura aceptan `as_of` y excluyen adquisiciones o procesamientos futuros. Ver
 `docs/geospatial-architecture.md`.
+
+## Fase 5: riesgo ambiental nacional
+
+`vigia_ai.risk` permanece separado de detección y spread. `risk_runs` fija AOI, modo,
+`as_of`, horizonte, configuración y snapshot; `risk_predictions` conserva índice
+experimental, componentes, faltantes, explicación y COG asociado. Los hotspots nunca
+son entrada causal del motor de riesgo.

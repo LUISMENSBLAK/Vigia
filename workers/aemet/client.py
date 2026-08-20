@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -47,6 +48,19 @@ class AemetObservation:
     pressure_hpa: float | None
     quality: dict[str, Any]
     raw_properties: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class AemetHourlyForecast:
+    municipality_code: str
+    issued_at: datetime
+    valid_at: datetime
+    latitude: float
+    longitude: float
+    model_name: str
+    model_run: str
+    variables: dict[str, Any]
+    quality: dict[str, Any]
 
 
 def _number(row: dict[str, Any], key: str) -> float | None:
@@ -117,6 +131,137 @@ def parse_aemet_observations(
     return observations
 
 
+def _period_values(items: object) -> dict[str, object]:
+    if not isinstance(items, list):
+        return {}
+    output: dict[str, object] = {}
+    for item in items:
+        if isinstance(item, dict) and isinstance(item.get("periodo"), str):
+            output[item["periodo"]] = item.get("value")
+    return output
+
+
+def _interval_value(items: object, hour: int) -> object | None:
+    if not isinstance(items, list):
+        return None
+    for item in items:
+        if not isinstance(item, dict) or not isinstance(item.get("periodo"), str):
+            continue
+        period = item["periodo"]
+        if len(period) == 2 and period.isdigit() and int(period) == hour:
+            return item.get("value")
+        if len(period) == 4 and period.isdigit():
+            start, end = int(period[:2]), int(period[2:])
+            if start <= hour < end:
+                return item.get("value")
+    return None
+
+
+def _wind_values(items: object) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
+    speed: dict[str, object] = {}
+    direction: dict[str, object] = {}
+    gust: dict[str, object] = {}
+    if not isinstance(items, list):
+        return speed, direction, gust
+    for item in items:
+        if not isinstance(item, dict) or not isinstance(item.get("periodo"), str):
+            continue
+        period = item["periodo"]
+        if isinstance(item.get("velocidad"), list) and item["velocidad"]:
+            speed[period] = item["velocidad"][0]
+        if isinstance(item.get("direccion"), list) and item["direccion"]:
+            direction[period] = item["direccion"][0]
+        if item.get("value") not in {None, ""}:
+            gust[period] = item["value"]
+    return speed, direction, gust
+
+
+def parse_aemet_hourly_forecasts(
+    payload: object,
+    *,
+    municipality_code: str,
+    latitude: float,
+    longitude: float,
+) -> list[AemetHourlyForecast]:
+    """Normaliza el producto horario sin convertir probabilidad de lluvia en precipitación."""
+    if not isinstance(payload, list) or not payload or not isinstance(payload[0], dict):
+        raise AemetPayloadError("La predicción horaria AEMET no tiene el formato esperado.")
+    document = {str(key): value for key, value in payload[0].items()}
+    try:
+        issued_raw = document["elaborado"]
+        if not isinstance(issued_raw, str):
+            raise ValueError("elaborado ausente")
+        issued_at = datetime.fromisoformat(issued_raw.replace("Z", "+00:00"))
+        if issued_at.tzinfo is None:
+            issued_at = issued_at.replace(tzinfo=ZoneInfo("Europe/Madrid"))
+        issued_at = issued_at.astimezone(UTC)
+        prediction = document["prediccion"]
+        if not isinstance(prediction, dict) or not isinstance(prediction.get("dia"), list):
+            raise ValueError("predicción sin días")
+    except (KeyError, TypeError, ValueError) as exc:
+        raise AemetPayloadError("La predicción horaria AEMET carece de metadatos.") from exc
+
+    timezone = ZoneInfo("Europe/Madrid")
+    output: list[AemetHourlyForecast] = []
+    for day in prediction["dia"]:
+        if not isinstance(day, dict) or not isinstance(day.get("fecha"), str):
+            raise AemetPayloadError("Día horario AEMET inválido.")
+        temperature = _period_values(day.get("temperatura"))
+        humidity = _period_values(day.get("humedadRelativa"))
+        precipitation = _period_values(day.get("precipitacion"))
+        sky = _period_values(day.get("estadoCielo"))
+        wind_speed, wind_direction, gust = _wind_values(day.get("vientoAndRachaMax"))
+        periods = sorted(
+            period
+            for period in set(temperature)
+            | set(humidity)
+            | set(precipitation)
+            | set(sky)
+            | set(wind_speed)
+            | set(gust)
+            if len(period) == 2
+        )
+        for period in periods:
+            if not period.isdigit() or len(period) not in {2, 4}:
+                continue
+            hour = int(period[:2])
+            local_midnight = datetime.fromisoformat(day["fecha"]).replace(tzinfo=timezone)
+            valid_at = local_midnight.replace(hour=hour).astimezone(UTC)
+            variables: dict[str, Any] = {
+                "temperature_c": temperature.get(period),
+                "relative_humidity_pct": humidity.get(period),
+                "wind_speed_kmh": wind_speed.get(period),
+                "wind_direction_cardinal": wind_direction.get(period),
+                "gust_kmh": gust.get(period),
+                "precipitation_probability_pct": _interval_value(
+                    day.get("probPrecipitacion"), hour
+                ),
+                "precipitation_mm": precipitation.get(period),
+                "sky_state": sky.get(period),
+                "raw_day": day,
+            }
+            output.append(
+                AemetHourlyForecast(
+                    municipality_code=municipality_code,
+                    issued_at=issued_at,
+                    valid_at=valid_at,
+                    latitude=latitude,
+                    longitude=longitude,
+                    model_name="AEMET_MUNICIPAL_HOURLY",
+                    model_run=issued_at.isoformat(),
+                    variables=variables,
+                    quality={
+                        "value_type": "PRONOSTICADO",
+                        "spatial_support": "municipality_reference_point",
+                        "precipitation_amount": "AVAILABLE_HOURLY_WHEN_NON_NULL",
+                        "fwi_compatible": False,
+                        "fwi_reason": "REQUIRES_24H_AGGREGATION_AND_PREVIOUS_DAILY_STATE",
+                    },
+                )
+            )
+    return output
+
+
 class AemetClient:
     observations_url = "https://opendata.aemet.es/opendata/api/observacion/convencional/todas"
 
@@ -170,3 +315,54 @@ class AemetClient:
                     "AEMET devolvió datos que no son JSON válido."
                 ) from fallback_exc
         return parse_aemet_observations(payload, received_at=datetime.now(UTC))
+
+    async def fetch_hourly_forecasts(
+        self, *, municipality_code: str, latitude: float, longitude: float
+    ) -> list[AemetHourlyForecast]:
+        url = (
+            "https://opendata.aemet.es/opendata/api/prediccion/"
+            f"especifica/municipio/horaria/{municipality_code}"
+        )
+        try:
+            async with httpx.AsyncClient(
+                timeout=self._timeout, transport=self._transport, follow_redirects=False
+            ) as client:
+                locator = await client.get(
+                    url,
+                    params={"api_key": self._api_key},
+                    headers={"Accept": "application/json"},
+                )
+                if not 200 <= locator.status_code < 300:
+                    raise AemetHTTPError(f"AEMET respondió con HTTP {locator.status_code}.")
+                envelope = locator.json()
+                if not isinstance(envelope, dict) or not isinstance(envelope.get("datos"), str):
+                    raise AemetPayloadError("AEMET no devolvió una URL de forecast válida.")
+                data_url = envelope["datos"]
+                if urlparse(data_url).hostname != "opendata.aemet.es":
+                    raise AemetPayloadError("AEMET devolvió una URL de datos no autorizada.")
+                response = await client.get(data_url, headers={"Accept": "application/json"})
+                if not 200 <= response.status_code < 300:
+                    raise AemetHTTPError(
+                        f"AEMET forecast respondió con HTTP {response.status_code}."
+                    )
+                try:
+                    payload = response.json()
+                except ValueError:
+                    try:
+                        payload = json.loads(response.content.decode("iso-8859-1"))
+                    except (UnicodeDecodeError, json.JSONDecodeError) as fallback_exc:
+                        raise AemetPayloadError(
+                            "AEMET forecast no devolvió JSON válido."
+                        ) from fallback_exc
+        except httpx.TimeoutException as exc:
+            raise AemetTimeoutError("AEMET no respondió dentro del tiempo límite.") from exc
+        except AemetError:
+            raise
+        except (httpx.HTTPError, ValueError) as exc:
+            raise AemetHTTPError("No se pudo completar la llamada de forecast AEMET.") from exc
+        return parse_aemet_hourly_forecasts(
+            payload,
+            municipality_code=municipality_code,
+            latitude=latitude,
+            longitude=longitude,
+        )

@@ -1,0 +1,43 @@
+{
+  "engine_version": "risk-baseline-v1",
+  "status": "EXPERIMENTAL",
+  "output": "environmental_susceptibility_index_0_100",
+  "probability": false,
+  "combination": {
+    "method": "unweighted_arithmetic_mean_of_available_components",
+    "required_component": "fire_weather",
+    "minimum_components": 2,
+    "reason": "avoid unsupported precision and hidden weighting before validation"
+  },
+  "presentation_bands": [
+    { "minimum": 0, "maximum_exclusive": 20, "label": "MUY_BAJO" },
+    { "minimum": 20, "maximum_exclusive": 40, "label": "BAJO" },
+    { "minimum": 40, "maximum_exclusive": 60, "label": "MODERADO" },
+    { "minimum": 60, "maximum_exclusive": 80, "label": "ALTO" },
+    { "minimum": 80, "maximum_inclusive": 100, "label": "MUY_ALTO" }
+  ],
+  "weather": {
+    "fwi_system": "CFS_FWI_1987",
+    "fwi_reference": "NRCan/CFS Information Report NOR-X-424 (2015)",
+    "previous_state_required": true,
+    "idw_power": 2,
+    "maximum_station_distance_km": 100,
+    "maximum_station_age_hours": 6,
+    "maximum_stations": 6
+  },
+  "vegetation": {
+    "primary_dryness_indicator": "NDMI",
+    "freshness_days": 10,
+    "cloud_or_invalid_pixels": "nodata"
+  },
+  "terrain": {
+    "slope_normalization_cap_deg": 45,
+    "aspect": "context_only",
+    "elevation": "context_only"
+  },
+  "land_cover": {
+    "role": "context_only",
+    "fuel_model": false
+  },
+  "disclaimer": "Experimental environmental index. Not a fire probability, ignition forecast, active-fire observation, or operational alert."
+}

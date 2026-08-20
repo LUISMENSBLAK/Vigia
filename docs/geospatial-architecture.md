@@ -78,3 +78,9 @@ manifiestos ni provenance.
 El procesamiento es incremental, por AOI y tesela, cacheable mediante product id, ETag y SHA-256,
 y paralelizable sin requerir infraestructura distribuida. España completa se construye como suma
 de productos verificables; no como una ejecución monolítica.
+
+## Superficies de riesgo
+
+Fase 5 reutiliza RAW/COG/storage/PostGIS. Los grids deben estar alineados explícitamente;
+el motor rechaza mezclas silenciosas de CRS o resolución. La calidad se materializa como
+una capa distinta. Los territorios no peninsulares usan CRS métricos regionales.

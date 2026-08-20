@@ -8,7 +8,7 @@ from sqlalchemy import text
 
 from services.api.vigia_api.database import VigiaDatabase
 
-from .client import AemetObservation
+from .client import AemetHourlyForecast, AemetObservation
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,9 +33,10 @@ class AemetRepository:
     ) -> AemetIngestRun:
         async with self._database.transaction() as connection:
             row = (
-                await connection.execute(
-                    text(
-                        """
+                (
+                    await connection.execute(
+                        text(
+                            """
                         insert into vigia.ingest_runs (
                           source_id, state, started_at, software_version,
                           request_id, configuration_hash
@@ -45,16 +46,19 @@ class AemetRepository:
                         from vigia.sources where code = :source_code
                         returning id, source_id
                         """
-                    ),
-                    {
-                        "started_at": started_at,
-                        "software_version": software_version,
-                        "request_id": request_id,
-                        "configuration_hash": configuration_hash,
-                        "source_code": self.source_code,
-                    },
+                        ),
+                        {
+                            "started_at": started_at,
+                            "software_version": software_version,
+                            "request_id": request_id,
+                            "configuration_hash": configuration_hash,
+                            "source_code": self.source_code,
+                        },
+                    )
                 )
-            ).mappings().one()
+                .mappings()
+                .one()
+            )
         return AemetIngestRun(id=row["id"], source_id=row["source_id"])
 
     async def persist(
@@ -289,3 +293,56 @@ class AemetRepository:
                     "detail": detail,
                 },
             )
+
+    async def persist_forecasts(self, forecasts: list[AemetHourlyForecast]) -> int:
+        payload = [
+            {
+                "issued_at": item.issued_at.isoformat(),
+                "valid_at": item.valid_at.isoformat(),
+                "longitude": item.longitude,
+                "latitude": item.latitude,
+                "location_key": item.municipality_code,
+                "model_name": item.model_name,
+                "model_run": item.model_run,
+                "variables": item.variables,
+                "quality": item.quality,
+            }
+            for item in forecasts
+        ]
+        if not payload:
+            return 0
+        async with self._database.transaction() as connection:
+            result = await connection.execute(
+                text(
+                    """
+                    with source as (
+                      select id from vigia.sources where code = :source_code
+                    ), input as (
+                      select * from jsonb_to_recordset(cast(:payload as jsonb)) as x(
+                        issued_at timestamptz, valid_at timestamptz,
+                        longitude double precision, latitude double precision,
+                        location_key text, model_name text, model_run text,
+                        variables jsonb, quality jsonb
+                      )
+                    )
+                    insert into vigia.weather_forecasts (
+                      source_id, issued_at, valid_at, location, location_key,
+                      model_name, model_run, variables, quality
+                    )
+                    select source.id, input.issued_at, input.valid_at,
+                      extensions.st_setsrid(
+                        extensions.st_makepoint(input.longitude, input.latitude), 4326
+                      )::extensions.geography,
+                      input.location_key, input.model_name, input.model_run,
+                      input.variables, input.quality
+                    from input cross join source
+                    on conflict (source_id, model_run, valid_at, location_key) do nothing
+                    returning id
+                    """
+                ),
+                {
+                    "source_code": self.source_code,
+                    "payload": json.dumps(payload, ensure_ascii=True, separators=(",", ":")),
+                },
+            )
+            return len(result.mappings().all())

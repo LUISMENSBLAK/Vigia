@@ -25,3 +25,9 @@ actual, interpolaciones ni valores de otra resolución.
 Los productos invalidados se conservan para auditoría. La futura reconstrucción histórica de
 supersesiones deberá considerar su intervalo `[published_at, invalidated_at)`; la API pública 4B
 sirve el catálogo vigente y aplica estrictamente los dos límites temporales anteriores.
+
+## Riesgo y forecast
+
+`ANALYSIS` solo admite entradas observadas/procesadas hasta `as_of`. `FORECAST` exige
+además `issued_at <= as_of`; `valid_at` puede ser posterior. Los tests rechazan cualquier
+componente futura. Igual AOI, tiempos, hashes y configuración generan la misma clave.

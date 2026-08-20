@@ -30,3 +30,9 @@ Fusión usa distancia geodésica, ventanas temporales, resolución, familias, pe
 Detection devuelve estados, reason codes y `evidence_strength` discreta. Esta fuerza no es una
 probabilidad calibrada. `INCENDIO_CONFIRMADO` no puede ser emitido automáticamente. Confidence
 recibe un `EvidenceBundle`, continúa en research y obliga `calibrated_probability = null`.
+
+## Risk baseline v1
+
+No usa ML. El FWI procede de ecuaciones publicadas y la composición es una regla
+determinista, no calibrada y experimental. No se declara probabilidad, precisión ni
+confianza estadística. Véanse `risk-engine.md` y la model card.

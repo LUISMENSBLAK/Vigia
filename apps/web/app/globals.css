@@ -127,6 +127,10 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .legend-anomaly { background: #c69a48; }
 .legend-possible { background: #d57a35; }
 .legend-probable { background: #ad5b38; }
+.legend-risk-low { background: #4f8a75; }
+.legend-risk-moderate { background: #d4a742; }
+.legend-risk-high { background: #b8352e; }
+.map-legend small { max-width: 190px; color: #9fb2aa; line-height: 1.45; }
 .incident-panel .eyebrow { color: var(--tech-300); font-size: .58rem; }
 .empty-incident { min-height: 390px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; border-bottom: 1px solid rgba(255,255,255,.1); }
 .empty-incident__mark { width: 48px; height: 48px; display: grid; place-items: center; border: 1px solid #58776c; border-radius: 50%; color: var(--tech-300); font-size: 1.5rem; }
@@ -176,6 +180,25 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .science-sections section > span { color: var(--tech-500); font-family: ui-monospace, monospace; font-size: .7rem; }
 .science-sections h2 { margin: 0 0 .9rem; font-family: Georgia, serif; font-size: 2rem; font-weight: 400; }
 .science-sections p { max-width: 760px; margin: 0; color: var(--muted); line-height: 1.75; }
+.risk-page { width: min(1120px, calc(100% - 48px)); margin: auto; padding: 7rem 0 9rem; }
+.risk-page > header { max-width: 900px; }
+.risk-page h1 { margin: 0; font-family: Georgia, serif; font-size: clamp(3rem, 7vw, 6rem); font-weight: 400; letter-spacing: -.04em; line-height: .98; }
+.risk-page > header > p:last-child { max-width: 760px; color: var(--muted); line-height: 1.7; }
+.risk-query { margin: 3rem 0; display: grid; grid-template-columns: repeat(2, minmax(0, 240px)) auto; gap: 1rem; align-items: end; }
+.risk-query label { display: grid; gap: .4rem; color: var(--muted); font-size: .7rem; text-transform: uppercase; }
+.risk-query input { min-height: 42px; padding: .6rem; border: 1px solid var(--line); background: white; }
+.risk-query button { min-height: 42px; padding: 0 1.2rem; border: 0; color: white; background: var(--navy-950); }
+.risk-page > section { margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--line); }
+.risk-result { margin-top: 1.5rem; padding: 1.5rem; border: 1px solid var(--line); background: var(--paper-strong); }
+.risk-result header { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.risk-result header div { display: grid; gap: .5rem; }
+.risk-result header span, .risk-result dt { color: var(--muted); font-size: .65rem; text-transform: uppercase; }
+.risk-result header strong { font-size: 1.4rem; }
+.science-warning { padding: 1rem; border-left: 3px solid var(--amber-500); background: #faf6e9; line-height: 1.5; }
+.risk-result dl { display: grid; grid-template-columns: repeat(2, 1fr); gap: .7rem 2rem; }
+.risk-result dl div { display: flex; justify-content: space-between; gap: 1rem; border-bottom: 1px solid var(--line); }
+.risk-result dd { margin: 0; font-family: ui-monospace, monospace; font-size: .72rem; }
+.risk-horizons { display: grid; gap: 1rem; }
 .language-placeholder { min-height: 100vh; max-width: 760px; margin: auto; padding: 14vh 24px; }
 .language-placeholder h1 { margin: 0; font-family: Georgia, serif; font-size: clamp(3rem, 8vw, 6rem); font-weight: 400; line-height: 1; }
 .language-placeholder > p:not(.eyebrow) { margin: 2rem 0; color: var(--muted); line-height: 1.7; }

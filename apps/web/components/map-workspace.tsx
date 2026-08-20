@@ -54,6 +54,7 @@ const inactiveLayers = [
 ];
 
 const geospatialLayers = [
+  { key: "risk", label: "Riesgo ambiental", codes: ["RISK_BASELINE"] },
   { key: "terrain", label: "Terrain", codes: ["ELEVATION", "SLOPE", "ASPECT", "TERRAIN_RUGGEDNESS"] },
   { key: "vegetation", label: "Vegetation", codes: ["NDVI", "NDMI", "NBR"] },
   { key: "landCover", label: "Land Cover", codes: ["LAND_COVER"] },
@@ -128,6 +129,7 @@ export function MapWorkspace() {
     useState<GeospatialCoverageCollection>(emptyGeospatialCoverage);
   const [geospatialLoading, setGeospatialLoading] = useState(true);
   const [visibleGeospatial, setVisibleGeospatial] = useState<Record<string, boolean>>({
+    risk: false,
     terrain: false,
     vegetation: false,
     landCover: false,
@@ -289,6 +291,7 @@ export function MapWorkspace() {
           showVegetation={visibleGeospatial.vegetation ?? false}
           showLandCover={visibleGeospatial.landCover ?? false}
           showDataCoverage={visibleGeospatial.coverage ?? false}
+          showRisk={visibleGeospatial.risk ?? false}
           onSelectObservation={selectObservation}
           onSelectIncident={selectIncident}
         />
@@ -301,11 +304,23 @@ export function MapWorkspace() {
           </span>
         </div>
         <div className="map-legend" aria-label="Simbología de incidentes">
-          <strong>Incidentes</strong>
-          <span><i className="legend-watch" />Vigilancia</span>
-          <span><i className="legend-anomaly" />Anomalía</span>
-          <span><i className="legend-possible" />Posible ignición</span>
-          <span><i className="legend-probable" />Probable incendio</span>
+          {visibleGeospatial.risk ? (
+            <>
+              <strong>Índice ambiental experimental</strong>
+              <span><i className="legend-risk-low" />0–20 Muy bajo</span>
+              <span><i className="legend-risk-moderate" />40–60 Moderado</span>
+              <span><i className="legend-risk-high" />80–100 Muy alto</span>
+              <small>No es probabilidad ni confirma fuego.</small>
+            </>
+          ) : (
+            <>
+              <strong>Incidentes</strong>
+              <span><i className="legend-watch" />Vigilancia</span>
+              <span><i className="legend-anomaly" />Anomalía</span>
+              <span><i className="legend-possible" />Posible ignición</span>
+              <span><i className="legend-probable" />Probable incendio</span>
+            </>
+          )}
         </div>
       </section>
       <aside className="incident-panel" aria-label="Detalle y alternativa textual de observaciones">
@@ -371,7 +386,7 @@ export function MapWorkspace() {
         </div>
       </aside>
       <footer className="timeline" aria-label="Horizonte temporal">
-        <div><strong>Observado</strong><span>Sin predicción disponible</span></div>
+        <div><strong>Actual / análisis</strong><span>Forecast solo si existe producto real</span></div>
         {["+15m", "+30m", "+1h", "+2h", "+4h", "+6h"].map((time) => <button key={time} disabled>{time}</button>)}
         <span className="timeline-warning">PREDICCIÓN EXPERIMENTAL · NO DISPONIBLE</span>
       </footer>

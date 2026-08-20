@@ -187,6 +187,48 @@ class GeospatialContextResponse(BaseModel):
     provenance: list[dict[str, Any]]
 
 
+class RiskAssessmentResponse(BaseModel):
+    id: str
+    mode: Literal["ANALYSIS", "FORECAST"]
+    as_of: datetime
+    valid_at: datetime
+    horizon_hours: int = Field(ge=0, le=240)
+    experimental_index: float | None = Field(default=None, ge=0, le=100)
+    risk_class: str
+    data_quality: Literal["COMPLETE", "PARTIAL", "INSUFFICIENT_DATA"]
+    component_scores: dict[str, float | None]
+    component_details: dict[str, Any]
+    reason_codes: list[str]
+    explanations: list[str]
+    missing_components: list[str]
+    input_resolutions: dict[str, Any]
+    engine_version: str
+    raster_product_id: str | None = None
+    provenance_id: str | None = None
+    disclaimer: str = (
+        "Índice ambiental experimental; no es probabilidad de incendio, "
+        "no confirma fuego y no es una alerta operativa."
+    )
+
+
+class RiskContextResponse(BaseModel):
+    availability: Literal["AVAILABLE", "PARTIAL", "STALE", "UNAVAILABLE", "ERROR"]
+    longitude: float
+    latitude: float
+    requested_as_of: datetime
+    assessment: RiskAssessmentResponse | None = None
+    message: str
+
+
+class RiskForecastResponse(BaseModel):
+    availability: Literal["AVAILABLE", "PARTIAL", "STALE", "UNAVAILABLE", "ERROR"]
+    longitude: float
+    latitude: float
+    requested_as_of: datetime
+    forecasts: list[RiskAssessmentResponse]
+    message: str
+
+
 def current_status(
     *,
     live_enabled: bool,

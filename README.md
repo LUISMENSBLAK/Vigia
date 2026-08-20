@@ -170,3 +170,7 @@ uv run python -m vigia_ai.fusion --from 2026-08-20T00:00:00Z \
 - [Despliegue](docs/deployment.md)
 - [Auditoría LIVE 2026-08-16](docs/live-integration-audit-2026-08-16.md)
 - [Auditoría LIVE 2026-08-20](docs/live-integration-audit-2026-08-20.md)
+- [Risk Engine baseline v1](docs/risk-engine.md)
+- [FWI 1987](docs/fire-weather-index.md)
+- [Validación LIVE Fase 5](docs/risk-live-validation.md)
+- [Model card risk-baseline-v1](docs/models/risk-baseline-v1.md)

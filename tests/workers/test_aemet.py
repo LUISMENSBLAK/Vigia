@@ -10,6 +10,7 @@ from workers.aemet.client import (
     AemetClient,
     AemetPayloadError,
     MissingAemetKeyError,
+    parse_aemet_hourly_forecasts,
     parse_aemet_observations,
 )
 from workers.aemet.repository import AemetIngestRun, AemetRepository
@@ -53,6 +54,42 @@ def test_parses_only_observed_station_values() -> None:
 def test_rejects_forecast_shaped_or_incomplete_data() -> None:
     with pytest.raises(AemetPayloadError):
         parse_aemet_observations([{"idema": "2444"}], received_at=datetime.now(UTC))
+
+
+def test_hourly_forecast_keeps_probability_separate_from_precipitation_amount() -> None:
+    forecasts = parse_aemet_hourly_forecasts(
+        [
+            {
+                "elaborado": "2026-08-20T08:00:00+02:00",
+                "prediccion": {
+                    "dia": [
+                        {
+                            "fecha": "2026-08-20T00:00:00",
+                            "temperatura": [{"periodo": "12", "value": 29}],
+                            "humedadRelativa": [{"periodo": "12", "value": 28}],
+                            "precipitacion": [{"periodo": "12", "value": 0.4}],
+                            "probPrecipitacion": [{"periodo": "0814", "value": 15}],
+                            "estadoCielo": [{"periodo": "12", "value": "11"}],
+                            "vientoAndRachaMax": [
+                                {"periodo": "12", "direccion": ["SW"], "velocidad": [18]},
+                                {"periodo": "12", "value": 31},
+                            ],
+                        }
+                    ]
+                },
+            }
+        ],
+        municipality_code="05019",
+        latitude=40.65,
+        longitude=-4.68,
+    )
+    forecast = forecasts[0]
+    assert forecast.valid_at == datetime(2026, 8, 20, 10, tzinfo=UTC)
+    assert forecast.variables["precipitation_probability_pct"] == 15
+    assert forecast.variables["precipitation_mm"] == 0.4
+    assert forecast.variables["wind_speed_kmh"] == 18
+    assert forecast.quality["value_type"] == "PRONOSTICADO"
+    assert forecast.quality["fwi_compatible"] is False
 
 
 async def test_rejects_untrusted_data_url() -> None:

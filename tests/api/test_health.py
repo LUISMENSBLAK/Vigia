@@ -127,9 +127,7 @@ def test_source_health_does_not_turn_stale_products_into_service_failure() -> No
         }
     ]
 
-    aemet = next(
-        item for item in main._aggregate_health(rows, fallback) if item.source == "AEMET"
-    )
+    aemet = next(item for item in main._aggregate_health(rows, fallback) if item.source == "AEMET")
     assert aemet.state.value == "OPERATIVO"
     assert aemet.data_freshness == "STALE"
 
@@ -155,9 +153,7 @@ def test_source_health_uses_configured_check_overdue_flag() -> None:
             "detail": "API comprobada.",
         }
     ]
-    aemet = next(
-        item for item in main._aggregate_health(rows, fallback) if item.source == "AEMET"
-    )
+    aemet = next(item for item in main._aggregate_health(rows, fallback) if item.source == "AEMET")
     assert aemet.state.value == "DEGRADADO"
     assert aemet.service_check_overdue is True
 
@@ -406,3 +402,67 @@ async def test_geospatial_coverage_rejects_oversized_aoi(
     monkeypatch.setattr(main, "database", GeospatialDatabase())
     response = await request("/api/geospatial/coverage?west=-10&south=35&east=5&north=44")
     assert response.status_code == 422
+
+
+class RiskDatabase(FakeDatabase):
+    async def risk_current(
+        self, *, longitude: float, latitude: float, as_of: datetime
+    ) -> dict[str, object] | None:
+        assert (longitude, latitude) == (-4.7, 40.7)
+        assert as_of == datetime(2026, 8, 20, 12, tzinfo=UTC)
+        return {
+            "id": "risk-row",
+            "mode": "ANALYSIS",
+            "as_of": as_of,
+            "valid_at": as_of,
+            "horizon_hours": 0,
+            "experimental_index": 43.2,
+            "risk_class": "MODERADO",
+            "data_quality": "PARTIAL",
+            "component_scores": {"fire_weather": 55.0, "terrain": 31.4},
+            "component_details": {"fire_weather": {"method": "FWI_1987"}},
+            "reason_codes": ["VEGETATION_UNAVAILABLE"],
+            "explanations": ["vegetation: NO DISPONIBLE"],
+            "missing_components": ["vegetation"],
+            "input_resolutions": {"weather": 25000},
+            "engine_version": "risk-baseline-v1",
+            "raster_product_id": None,
+            "provenance_id": None,
+        }
+
+    async def risk_forecast(
+        self,
+        *,
+        longitude: float,
+        latitude: float,
+        as_of: datetime,
+        max_horizon_hours: int,
+    ) -> list[dict[str, object]]:
+        assert max_horizon_hours == 72
+        return []
+
+    async def risk_layers(self) -> list[dict[str, object]]:
+        return []
+
+
+async def test_risk_api_marks_index_as_experimental_not_probability(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(main, "database", RiskDatabase())
+    cutoff = "2026-08-20T12:00:00Z"
+    payload = (await request(f"/api/risk/context?lat=40.7&lon=-4.7&as_of={cutoff}")).json()
+    assert payload["availability"] == "PARTIAL"
+    assert payload["assessment"]["experimental_index"] == 43.2
+    assert "probabilidad" in payload["assessment"]["disclaimer"]
+    assert "probability" not in payload["assessment"]
+
+
+async def test_risk_forecast_returns_unavailable_without_real_horizons(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(main, "database", RiskDatabase())
+    cutoff = "2026-08-20T12:00:00Z"
+    payload = (await request(f"/api/risk/forecast?lat=40.7&lon=-4.7&as_of={cutoff}")).json()
+    assert payload["availability"] == "UNAVAILABLE"
+    assert payload["forecasts"] == []
+    assert payload["message"].startswith("NO DISPONIBLE")

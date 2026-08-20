@@ -38,3 +38,9 @@ nomenclatura, porcentaje declarado, fecha y geometría, enlazada al producto pad
 `AVAILABLE` requiere un artefacto local/objeto y hash verificables. Un registro de catálogo o una
 respuesta HTTP correcta no basta para declarar una capa disponible. El `as_of` de API y Replay
 filtra tanto adquisición como procesamiento para impedir future leakage.
+
+## Riesgo ambiental
+
+Cada run conserva fuente/producto, hashes, versión, configuración, software/commit,
+fecha, CRS, resolución, algoritmo, AOI y output hash. El snapshot excluye secretos. Las
+razones y faltantes se persisten con la salida.

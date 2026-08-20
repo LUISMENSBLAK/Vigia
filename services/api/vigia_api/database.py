@@ -180,8 +180,10 @@ class VigiaDatabase:
         try:
             async with self._engine.connect() as connection:
                 row = (
-                    await connection.execute(statement, {"incident_id": incident_id})
-                ).mappings().one_or_none()
+                    (await connection.execute(statement, {"incident_id": incident_id}))
+                    .mappings()
+                    .one_or_none()
+                )
         except (SQLAlchemyError, OSError) as exc:
             raise DatabaseUnavailableError("No se pudo consultar el incidente.") from exc
         return dict(row) if row is not None else None
@@ -436,9 +438,10 @@ class VigiaDatabase:
         try:
             async with self._engine.connect() as connection:
                 row = (
-                    await connection.execute(
-                        text(
-                            """
+                    (
+                        await connection.execute(
+                            text(
+                                """
                             select id::text, product_id, layer, availability::text,
                               storage_uri, raster_band, value_units, render_hint
                             from vigia.geospatial_products
@@ -446,13 +449,123 @@ class VigiaDatabase:
                               and availability in ('AVAILABLE', 'PARTIAL')
                               and invalidated_at is null
                             """
-                        ),
-                        {"product_id": product_id},
+                            ),
+                            {"product_id": product_id},
+                        )
                     )
-                ).mappings().one_or_none()
+                    .mappings()
+                    .one_or_none()
+                )
         except (SQLAlchemyError, OSError) as exc:
             raise DatabaseUnavailableError("No se pudo consultar el producto geoespacial.") from exc
         return dict(row) if row is not None else None
+
+    async def risk_current(
+        self, *, longitude: float, latitude: float, as_of: datetime
+    ) -> dict[str, Any] | None:
+        statement = text(
+            """
+            select prediction.id::text, prediction.mode::text, prediction.as_of,
+              prediction.valid_at, prediction.horizon_hours,
+              prediction.experimental_index, prediction.risk_class,
+              run.data_quality::text as data_quality,
+              prediction.component_scores, prediction.component_details,
+              prediction.reason_codes, prediction.explanations,
+              prediction.missing_components, prediction.input_resolutions,
+              prediction.engine_version, prediction.raster_product_id::text,
+              prediction.provenance_id::text
+            from vigia.risk_predictions prediction
+            join vigia.risk_runs run on run.id = prediction.run_id
+            where run.state = 'SUCCEEDED' and prediction.mode = 'ANALYSIS'
+              and prediction.as_of <= :as_of and prediction.valid_at <= :as_of
+              and extensions.st_covers(
+                prediction.geometry,
+                extensions.st_setsrid(
+                  extensions.st_makepoint(:longitude, :latitude), 4326
+                )
+              )
+            order by prediction.valid_at desc, prediction.created_at desc
+            limit 1
+            """
+        )
+        try:
+            async with self._engine.connect() as connection:
+                row = (
+                    (
+                        await connection.execute(
+                            statement,
+                            {"longitude": longitude, "latitude": latitude, "as_of": as_of},
+                        )
+                    )
+                    .mappings()
+                    .one_or_none()
+                )
+        except (SQLAlchemyError, OSError) as exc:
+            raise DatabaseUnavailableError("No se pudo consultar el riesgo actual.") from exc
+        return dict(row) if row is not None else None
+
+    async def risk_forecast(
+        self,
+        *,
+        longitude: float,
+        latitude: float,
+        as_of: datetime,
+        max_horizon_hours: int,
+    ) -> list[dict[str, Any]]:
+        return await self._mapped_query(
+            text(
+                """
+                select distinct on (prediction.valid_at)
+                  prediction.id::text, prediction.mode::text, prediction.as_of,
+                  prediction.valid_at, prediction.horizon_hours,
+                  prediction.experimental_index, prediction.risk_class,
+                  run.data_quality::text as data_quality,
+                  prediction.component_scores, prediction.component_details,
+                  prediction.reason_codes, prediction.explanations,
+                  prediction.missing_components, prediction.input_resolutions,
+                  prediction.engine_version, prediction.raster_product_id::text,
+                  prediction.provenance_id::text
+                from vigia.risk_predictions prediction
+                join vigia.risk_runs run on run.id = prediction.run_id
+                where run.state = 'SUCCEEDED' and prediction.mode = 'FORECAST'
+                  and prediction.as_of <= :as_of and prediction.valid_at >= :as_of
+                  and prediction.horizon_hours <= :max_horizon_hours
+                  and extensions.st_covers(
+                    prediction.geometry,
+                    extensions.st_setsrid(
+                      extensions.st_makepoint(:longitude, :latitude), 4326
+                    )
+                  )
+                order by prediction.valid_at, prediction.as_of desc, prediction.created_at desc
+                """
+            ),
+            {
+                "longitude": longitude,
+                "latitude": latitude,
+                "as_of": as_of,
+                "max_horizon_hours": max_horizon_hours,
+            },
+            "No se pudo consultar el pronóstico de riesgo.",
+        )
+
+    async def risk_layers(self) -> list[dict[str, Any]]:
+        return await self._mapped_query(
+            text(
+                """
+                select product.id::text, product.product_id, product.layer,
+                  product.availability::text, product.observed_at, product.processed_at,
+                  product.output_resolution_m, product.raster_band, product.value_units,
+                  product.render_hint, product.quality, source.name as source
+                from vigia.geospatial_products product
+                join vigia.sources source on source.id = product.source_id
+                where product.layer in ('RISK_BASELINE', 'FWI', 'RISK_DATA_QUALITY')
+                  and product.invalidated_at is null
+                order by product.observed_at desc nulls last, product.layer
+                """
+            ),
+            {},
+            "No se pudieron consultar las capas de riesgo.",
+        )
 
     async def _mapped_query(
         self, statement: Any, parameters: dict[str, Any], safe_error: str

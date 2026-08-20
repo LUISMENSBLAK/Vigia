@@ -25,6 +25,7 @@ interface MapCanvasProps {
   showVegetation: boolean;
   showLandCover: boolean;
   showDataCoverage: boolean;
+  showRisk: boolean;
   onSelectObservation: (observation: FireObservationFeature) => void;
   onSelectIncident: (incident: IncidentFeature) => void;
 }
@@ -71,7 +72,13 @@ function syncRasterLayer(
 function syncGeospatialLayers(
   map: maplibregl.Map,
   coverage: GeospatialCoverageCollection,
-  visibility: { terrain: boolean; vegetation: boolean; landCover: boolean; coverage: boolean },
+  visibility: {
+    terrain: boolean;
+    vegetation: boolean;
+    landCover: boolean;
+    coverage: boolean;
+    risk: boolean;
+  },
 ): void {
   const source = map.getSource("geospatial-coverage") as maplibregl.GeoJSONSource | undefined;
   source?.setData(coverage);
@@ -80,6 +87,12 @@ function syncGeospatialLayers(
     "geospatial-terrain",
     preferredProduct(coverage, ["ELEVATION", "SLOPE"]),
     visibility.terrain,
+  );
+  syncRasterLayer(
+    map,
+    "geospatial-risk",
+    preferredProduct(coverage, ["RISK_BASELINE"]),
+    visibility.risk,
   );
   syncRasterLayer(
     map,
@@ -111,6 +124,7 @@ export function MapCanvas({
   showVegetation,
   showLandCover,
   showDataCoverage,
+  showRisk,
   onSelectObservation,
   onSelectIncident,
 }: MapCanvasProps) {
@@ -126,6 +140,7 @@ export function MapCanvas({
     vegetation: showVegetation,
     landCover: showLandCover,
     coverage: showDataCoverage,
+    risk: showRisk,
   });
 
   useEffect(() => {
@@ -348,12 +363,20 @@ export function MapCanvas({
       vegetation: showVegetation,
       landCover: showLandCover,
       coverage: showDataCoverage,
+      risk: showRisk,
     };
     const map = mapRef.current;
     if (map?.isStyleLoaded()) {
       syncGeospatialLayers(map, geospatialCoverage, geospatialVisibilityRef.current);
     }
-  }, [geospatialCoverage, showTerrain, showVegetation, showLandCover, showDataCoverage]);
+  }, [
+    geospatialCoverage,
+    showTerrain,
+    showVegetation,
+    showLandCover,
+    showDataCoverage,
+    showRisk,
+  ]);
 
   useEffect(() => {
     showObservationsRef.current = showObservations;
@@ -386,8 +409,8 @@ export function MapCanvas({
       role="region"
       aria-label={
         observations.features.length
-          ? `Mapa de España con ${observations.features.length} observaciones térmicas y ${incidents.features.length} incidentes derivados`
-          : `Mapa base de España con ${incidents.features.length} incidentes derivados`
+          ? `Mapa de España con ${observations.features.length} observaciones térmicas, ${incidents.features.length} incidentes derivados y capa de riesgo ${showRisk ? "visible" : "oculta"}`
+          : `Mapa base de España con ${incidents.features.length} incidentes derivados y capa de riesgo ${showRisk ? "visible" : "oculta"}`
       }
     />
   );

@@ -4,6 +4,7 @@ import pytest
 
 from vigia_geospatial.aoi import AOIRequest, resolve_inline_aoi
 from vigia_geospatial.context import products_for_point
+from vigia_geospatial.crs import projected_crs_for_spain
 from vigia_geospatial.models import AvailabilityState, GeospatialLayer, GeospatialProduct
 
 
@@ -79,3 +80,20 @@ def test_as_of_excludes_products_observed_or_processed_in_the_future() -> None:
 def test_as_of_requires_timezone() -> None:
     with pytest.raises(ValueError, match="zona horaria"):
         products_for_point([], longitude=-4.7, latitude=40.65, as_of=datetime(2026, 8, 20))
+
+
+@pytest.mark.parametrize(
+    ("longitude", "latitude", "epsg"),
+    [
+        (-8.5, 42.0, 25829),
+        (-4.7, 40.7, 25830),
+        (2.7, 39.6, 25831),
+        (-15.5, 28.1, 4083),
+        (-5.3, 35.9, 25830),
+        (-2.94, 35.29, 25830),
+    ],
+)
+def test_projected_crs_covers_all_spanish_territories(
+    longitude: float, latitude: float, epsg: int
+) -> None:
+    assert projected_crs_for_spain(longitude, latitude).to_epsg() == epsg
