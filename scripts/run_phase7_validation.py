@@ -104,7 +104,12 @@ async def replay_incidents(
     for row in rows:
         event_id = str(row["event_key"])
         case_id = str(row["case_key"])
-        payload = dict(row["incident"])
+        raw_incident = row["incident"]
+        payload = (
+            json.loads(raw_incident)
+            if isinstance(raw_incident, str)
+            else dict(raw_incident)
+        )
         incident_id = str(payload["replay_incident_id"])
         replay_output_events.add(event_id)
         replay_commits.add(str(row["code_commit"]))
