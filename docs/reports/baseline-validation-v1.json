@@ -1,0 +1,401 @@
+{
+  "report_version": "validation-report-v1",
+  "run_key": "f3f0a6d2de170f3713c86c10ba3ee67afe33a7e2b3f48f3c202582ee702005b0",
+  "dataset_version": "historical-corpus-jcyl-high-v1",
+  "dataset_hash": "89606f6395cdabe05f47311e022b1e6c52474f2cc10ffe622078db0c66985256",
+  "split_version": "validation-split-v1",
+  "split_hash": "610aa6230c51d8b2f94405aff959b8d5e5eb15fe22d8f1e03d60aed6915503cf",
+  "split_role": "DEVELOPMENT",
+  "engine_versions": {
+    "detection": "detection-rules-v1",
+    "fusion": "fusion-baseline-v1",
+    "replay": "replay-v1",
+    "risk": "risk-baseline-v1"
+  },
+  "matcher_version": "spatiotemporal-one-to-one-v1",
+  "matcher_configuration_hash": "673ebfd69ccf6db7814b5197476d0064642bb8344bc6a1d6edc981427d704936",
+  "code_commit": "30abbf9b45fd8ae1f98ad963e1e95d392bbe98e9",
+  "configuration_hash": "af822efee5fef25ee20b5b9b2622b4e123fa89e0df518dcdcc6d3d77074c714a",
+  "started_at": "2026-08-21T01:37:24Z",
+  "completed_at": "2026-08-21T01:37:24Z",
+  "sample_counts": {
+    "dataset_controls": 0,
+    "dataset_events": 5866,
+    "evaluated_events": 1,
+    "matched_events": 1,
+    "missed_events": 0,
+    "replay_incidents_at_probable": 4,
+    "split_events": 3520
+  },
+  "eligibility_counts": {
+    "alert_precision": 0,
+    "controls": 0,
+    "event_detection": 1,
+    "localization": 1,
+    "sensor_observation_latency": 1
+  },
+  "excluded_counts": {
+    "no_control_coverage": 7,
+    "no_replay_output": 3519,
+    "test_accesses": 0
+  },
+  "metrics": [
+    {
+      "metric": "event_recall",
+      "status": "INSUFFICIENT_SAMPLE",
+      "unit": "proportion",
+      "population": "evaluable positive reference events",
+      "n": 1,
+      "value": null,
+      "numerator": 1,
+      "denominator": 1,
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower": 0.20654931437723745,
+        "upper": 1.0,
+        "method": "Wilson score interval without continuity correction"
+      },
+      "reason": "INSUFFICIENT_SAMPLE",
+      "limitations": [
+        "N=1 es menor que la política preespecificada N=30."
+      ]
+    },
+    {
+      "metric": "miss_rate",
+      "status": "INSUFFICIENT_SAMPLE",
+      "unit": "proportion",
+      "population": "evaluable positive reference events",
+      "n": 1,
+      "value": null,
+      "numerator": 0,
+      "denominator": 1,
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower": 0.0,
+        "upper": 0.7934506856227626,
+        "method": "Wilson score interval without continuity correction"
+      },
+      "reason": "INSUFFICIENT_SAMPLE",
+      "limitations": [
+        "N=1 es menor que la política preespecificada N=30."
+      ]
+    },
+    {
+      "metric": "alert_precision",
+      "status": "NO_DISPONIBLE",
+      "unit": "proportion",
+      "population": "evaluable VIGÍA incidents",
+      "n": 0,
+      "value": null,
+      "numerator": null,
+      "denominator": null,
+      "confidence_interval": null,
+      "reason": "NO_CONTROL_COVERAGE",
+      "limitations": [
+        "Los incidentes sin referencia suficiente no se convierten automáticamente en FP."
+      ]
+    },
+    {
+      "metric": "f1",
+      "status": "NO_DISPONIBLE",
+      "unit": "harmonic proportion",
+      "population": "same evaluable event/alert population",
+      "n": 0,
+      "value": null,
+      "numerator": null,
+      "denominator": null,
+      "confidence_interval": null,
+      "reason": "Precision y recall no están definidos sobre una población compatible.",
+      "limitations": []
+    },
+    {
+      "metric": "false_alerts_per_1000_km2_day",
+      "status": "NO_DISPONIBLE",
+      "unit": "incidents / 1000 km²-day",
+      "population": "evaluable control coverage",
+      "n": 0,
+      "value": null,
+      "numerator": null,
+      "denominator": null,
+      "confidence_interval": null,
+      "reason": "NO_CONTROL_COVERAGE",
+      "limitations": []
+    },
+    {
+      "metric": "false_alerts_per_day",
+      "status": "NO_DISPONIBLE",
+      "unit": "incidents / day",
+      "population": "evaluable control coverage",
+      "n": 0,
+      "value": null,
+      "numerator": null,
+      "denominator": null,
+      "confidence_interval": null,
+      "reason": "NO_CONTROL_COVERAGE",
+      "limitations": []
+    },
+    {
+      "metric": "median_sensor_observation_latency",
+      "status": "INSUFFICIENT_SAMPLE",
+      "unit": "seconds",
+      "population": "matched events with compatible reference timestamps",
+      "n": 1,
+      "value": null,
+      "numerator": null,
+      "denominator": null,
+      "confidence_interval": null,
+      "reason": "INSUFFICIENT_SAMPLE",
+      "limitations": [
+        "FIRMS histórico mide tiempo de observación, no disponibilidad operacional."
+      ]
+    },
+    {
+      "metric": "p90_sensor_observation_latency",
+      "status": "INSUFFICIENT_SAMPLE",
+      "unit": "seconds",
+      "population": "matched events with compatible reference timestamps",
+      "n": 1,
+      "value": null,
+      "numerator": null,
+      "denominator": null,
+      "confidence_interval": null,
+      "reason": "INSUFFICIENT_SAMPLE",
+      "limitations": [
+        "FIRMS histórico mide tiempo de observación, no disponibilidad operacional."
+      ]
+    },
+    {
+      "metric": "median_localization_error",
+      "status": "INSUFFICIENT_SAMPLE",
+      "unit": "metres",
+      "population": "matched events with spatially compatible reference",
+      "n": 1,
+      "value": null,
+      "numerator": null,
+      "denominator": null,
+      "confidence_interval": null,
+      "reason": "INSUFFICIENT_SAMPLE",
+      "limitations": [
+        "La referencia JCyL es un punto oficial aproximado, no un origen subpíxel."
+      ]
+    },
+    {
+      "metric": "p90_localization_error",
+      "status": "INSUFFICIENT_SAMPLE",
+      "unit": "metres",
+      "population": "matched events with spatially compatible reference",
+      "n": 1,
+      "value": null,
+      "numerator": null,
+      "denominator": null,
+      "confidence_interval": null,
+      "reason": "INSUFFICIENT_SAMPLE",
+      "limitations": [
+        "La referencia JCyL es un punto oficial aproximado, no un origen subpíxel."
+      ]
+    },
+    {
+      "metric": "p95_localization_error",
+      "status": "INSUFFICIENT_SAMPLE",
+      "unit": "metres",
+      "population": "matched events with spatially compatible reference",
+      "n": 1,
+      "value": null,
+      "numerator": null,
+      "denominator": null,
+      "confidence_interval": null,
+      "reason": "INSUFFICIENT_SAMPLE",
+      "limitations": [
+        "La referencia JCyL es un punto oficial aproximado, no un origen subpíxel."
+      ]
+    },
+    {
+      "metric": "operational_availability_latency",
+      "status": "NO_DISPONIBLE",
+      "unit": "NO_DISPONIBLE",
+      "population": "matched historical events",
+      "n": 0,
+      "value": null,
+      "numerator": null,
+      "denominator": null,
+      "confidence_interval": null,
+      "reason": "FIRMS histórico no conserva disponibilidad operacional.",
+      "limitations": []
+    },
+    {
+      "metric": "risk_discrimination",
+      "status": "NO_DISPONIBLE",
+      "unit": "NO_DISPONIBLE",
+      "population": "positive events and comparable controls",
+      "n": 0,
+      "value": null,
+      "numerator": null,
+      "denominator": null,
+      "confidence_interval": null,
+      "reason": "NO_RISK_VALUE y NO_CONTROL_COVERAGE",
+      "limitations": []
+    },
+    {
+      "metric": "replay_materialization_coverage_rate",
+      "status": "AVAILABLE",
+      "unit": "proportion",
+      "population": "DEVELOPMENT positive references",
+      "n": 3520,
+      "value": 0.0002840909090909091,
+      "numerator": 1,
+      "denominator": 3520,
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower": 0.000050150781664891125,
+        "upper": 0.0016075454821871877,
+        "method": "Wilson score interval without continuity correction"
+      },
+      "reason": null,
+      "limitations": [
+        "Mide cobertura de replay materializado, no rendimiento."
+      ]
+    },
+    {
+      "metric": "event_recall_at_vigilancia",
+      "status": "INSUFFICIENT_SAMPLE",
+      "unit": "proportion",
+      "population": "evaluable positive reference events",
+      "n": 1,
+      "value": null,
+      "numerator": 1,
+      "denominator": 1,
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower": 0.20654931437723745,
+        "upper": 1.0,
+        "method": "Wilson score interval without continuity correction"
+      },
+      "reason": "INSUFFICIENT_SAMPLE",
+      "limitations": [
+        "N=1 es menor que la política preespecificada N=30."
+      ]
+    },
+    {
+      "metric": "event_recall_at_anomalia",
+      "status": "INSUFFICIENT_SAMPLE",
+      "unit": "proportion",
+      "population": "evaluable positive reference events",
+      "n": 1,
+      "value": null,
+      "numerator": 1,
+      "denominator": 1,
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower": 0.20654931437723745,
+        "upper": 1.0,
+        "method": "Wilson score interval without continuity correction"
+      },
+      "reason": "INSUFFICIENT_SAMPLE",
+      "limitations": [
+        "N=1 es menor que la política preespecificada N=30."
+      ]
+    },
+    {
+      "metric": "event_recall_at_posible_ignicion",
+      "status": "INSUFFICIENT_SAMPLE",
+      "unit": "proportion",
+      "population": "evaluable positive reference events",
+      "n": 1,
+      "value": null,
+      "numerator": 1,
+      "denominator": 1,
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower": 0.20654931437723745,
+        "upper": 1.0,
+        "method": "Wilson score interval without continuity correction"
+      },
+      "reason": "INSUFFICIENT_SAMPLE",
+      "limitations": [
+        "N=1 es menor que la política preespecificada N=30."
+      ]
+    },
+    {
+      "metric": "event_recall_at_probable_incendio",
+      "status": "INSUFFICIENT_SAMPLE",
+      "unit": "proportion",
+      "population": "evaluable positive reference events",
+      "n": 1,
+      "value": null,
+      "numerator": 1,
+      "denominator": 1,
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower": 0.20654931437723745,
+        "upper": 1.0,
+        "method": "Wilson score interval without continuity correction"
+      },
+      "reason": "INSUFFICIENT_SAMPLE",
+      "limitations": [
+        "N=1 es menor que la política preespecificada N=30."
+      ]
+    }
+  ],
+  "failures": [
+    {
+      "case_id": "74d0d7969180e521440622d111b991efb13b90d37e2b15f4794a0c0797d2df88:REPLAY-INC-294f89833eb0e5da",
+      "event_id": null,
+      "incident_id": "74d0d7969180e521440622d111b991efb13b90d37e2b15f4794a0c0797d2df88:REPLAY-INC-294f89833eb0e5da",
+      "reason_codes": [
+        "FALSE_SINGLE_PASS"
+      ],
+      "evidence": {
+        "reference_coverage_sufficient": true
+      },
+      "manual_override": false
+    },
+    {
+      "case_id": "74d0d7969180e521440622d111b991efb13b90d37e2b15f4794a0c0797d2df88:REPLAY-INC-301d2e9d6f0ee082",
+      "event_id": null,
+      "incident_id": "74d0d7969180e521440622d111b991efb13b90d37e2b15f4794a0c0797d2df88:REPLAY-INC-301d2e9d6f0ee082",
+      "reason_codes": [
+        "FALSE_SINGLE_PASS"
+      ],
+      "evidence": {
+        "reference_coverage_sufficient": true
+      },
+      "manual_override": false
+    },
+    {
+      "case_id": "74d0d7969180e521440622d111b991efb13b90d37e2b15f4794a0c0797d2df88:REPLAY-INC-ba1c77c341b95767",
+      "event_id": null,
+      "incident_id": "74d0d7969180e521440622d111b991efb13b90d37e2b15f4794a0c0797d2df88:REPLAY-INC-ba1c77c341b95767",
+      "reason_codes": [
+        "FALSE_SINGLE_PASS"
+      ],
+      "evidence": {
+        "reference_coverage_sufficient": true
+      },
+      "manual_override": false
+    }
+  ],
+  "limitations": [
+    "El dataset evaluable v1 representa Castilla y León, no España.",
+    "Replay materializado para 1 de 3520 referencias DEVELOPMENT; no soporta claims de rendimiento.",
+    "No existen controles respaldados; precision y falsas alertas no son calculables.",
+    "FIRMS histórico no permite latencia operacional.",
+    "TEST permanece congelado y no fue ejecutado."
+  ],
+  "unavailable_metrics": [
+    "PR_AUC",
+    "ROC_AUC",
+    "BRIER_SCORE",
+    "ECE",
+    "CALIBRATION",
+    "OPERATIONAL_AVAILABILITY_LATENCY",
+    "PERIMETER_IOU",
+    "HAUSDORFF_DISTANCE",
+    "AREA_ERROR",
+    "ALERT_PRECISION",
+    "FALSE_ALERT_BURDEN",
+    "RISK_DISCRIMINATION"
+  ],
+  "test_access_audit_id": null,
+  "live_state_mutated": false,
+  "report_hash": "9df58b3f7cc75946b6bb43998f54017fc69ee9cb789fed011ba380679f837c67"
+}

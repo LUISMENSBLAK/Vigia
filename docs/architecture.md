@@ -64,3 +64,14 @@ son entrada causal del motor de riesgo.
 mismo Fusion/Detection/Risk con `ReplayClock` y un contexto cortado por `as_of`. Ground truth vive
 en tablas/contextos separados y solo participa en evaluación posterior. Las tablas `replay_*` son
 privadas, idempotentes, con RLS forzado y no mutan el estado LIVE. Ver `replay-engine.md`.
+
+## Fase 7: validación científica
+
+`vigia_ai.validation` queda separado de Detection y Replay. Versiona corpus, split por grupos,
+baseline, matcher, elegibilidad por métrica, incertidumbre y taxonomía de errores. TEST permanece
+congelado y exige auditoría. PostGIS conserva manifests, miembros, runs, métricas y asociaciones en
+tablas privadas con RLS forzado; un informe publicado es inmutable. La API expone solo superficies
+de lectura y `/validacion` muestra N, intervalos, faltantes y alcance real sin fabricar ceros.
+
+El primer run real usa DEVELOPMENT y no muta tablas LIVE. Véanse
+`scientific-validation-protocol.md`, `validation-live-results.md` y `validation-limitations.md`.

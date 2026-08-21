@@ -55,3 +55,14 @@ Cada `ReplayCase` conserva manifest/hash, AOI, ventana, disponibilidad de sensor
 input y de referencia. Cada `ReplayRun` conserva commit, versiones de motores, configuración/hash,
 snapshot hash, steps, progreso, duración y memoria aproximada cuando es medible. Los inputs FIRMS
 con disponibilidad no reconstruible están marcados como proxy y prohíben claims de latencia.
+
+## Validación científica
+
+Cada versión de dataset conserva snapshots de fuente, checksums, fecha de recuperación, filtros,
+política de selección, cobertura y hash canónico. El split materializa member id, event group y rol;
+su hash se verifica antes de ejecutar. Un `ValidationRun` enlaza dataset, split, engine, matcher,
+commit, configuración, semilla, counts, exclusiones, limitaciones, métricas, matches y errores.
+
+El report hash cubre el documento completo salvo su propio hash. `run_key` permite idempotencia.
+Los resultados publicados y los logs de acceso TEST son inmutables. Tokens, `.env` y payloads LIVE
+no forman parte de estos artefactos.

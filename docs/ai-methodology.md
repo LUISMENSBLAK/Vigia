@@ -43,3 +43,9 @@ Replay no entrena ni modifica los motores. El evento oficial se oculta durante l
 matching espacio-temporal ocurre después, en un módulo de evaluación separado. La política del
 corpus se congela antes de ver resultados. No hay métricas científicas de Fase 6 mientras no existan
 positivos y controles representativos, splits inmutables y timestamps de disponibilidad defendibles.
+
+Fase 7 materializa esos contratos sin entrenar: corpus y split se congelaron antes del baseline,
+matching primario y sensibilidad se preespecificaron, y TEST queda detrás de una auditoría. El
+primer ValidationRun solo dispone de N=1 evaluable y cero controles; por eso recall, latencia y
+localización son `INSUFFICIENT_SAMPLE`, mientras precision, F1, calibración y falsas alertas son
+`NO DISPONIBLE`. El resultado no autoriza cambios caso por caso ni claims operacionales.

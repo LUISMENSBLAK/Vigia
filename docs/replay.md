@@ -39,3 +39,13 @@ componente futura. Igual AOI, tiempos, hashes y configuración generan la misma 
 
 El histórico AEMET diario inspeccionado no ofrece por sí solo las observaciones de mediodía local
 que requiere FWI. En ese caso Replay muestra `UNAVAILABLE`; no inventa hora ni inicialización.
+
+## Frontera de validación
+
+Replay termina antes del matching científico. Durante cada step no recibe event id, coordenada de
+referencia, perímetro final ni timestamps posteriores. Solo después de completar un run aislado,
+Validation asocia salidas a referencias del split permitido. La ausencia de Replay para una
+referencia se registra como cobertura faltante; no se seleccionan silenciosamente casos favorables.
+
+El ValidationRun v1 usó DEVELOPMENT. TEST no se leyó y los contadores de acceso permanecieron en
+cero. Una repetición con los mismos hashes devolvió el mismo run, sin escribir incidentes LIVE.
