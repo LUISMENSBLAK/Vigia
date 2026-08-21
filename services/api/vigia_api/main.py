@@ -906,9 +906,7 @@ async def replay_observations(
     limit: int = Query(default=5000, ge=1, le=5000),
 ) -> dict[str, Any]:
     try:
-        rows = await _require_database().replay_observations(
-            run_id, as_of=as_of, limit=limit
-        )
+        rows = await _require_database().replay_observations(run_id, as_of=as_of, limit=limit)
     except DatabaseUnavailableError as exc:
         raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc
     return {
@@ -946,3 +944,85 @@ async def replay_observations(
             else "SIN DATOS en el corte temporal solicitado."
         ),
     }
+
+
+@app.get(
+    "/api/validation/datasets",
+    response_model=list[dict[str, Any]],
+    tags=["validation"],
+)
+async def validation_datasets(
+    limit: int = Query(default=100, ge=1, le=500),
+) -> list[dict[str, Any]]:
+    try:
+        return await _require_database().validation_datasets(limit=limit)
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc
+
+
+@app.get(
+    "/api/validation/datasets/{dataset_id}",
+    response_model=dict[str, Any],
+    tags=["validation"],
+)
+async def validation_dataset(dataset_id: str) -> dict[str, Any]:
+    try:
+        row = await _require_database().validation_dataset(dataset_id)
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc
+    if row is None:
+        raise HTTPException(status_code=404, detail="ValidationDataset NO DISPONIBLE")
+    return row
+
+
+@app.get(
+    "/api/validation/runs",
+    response_model=list[dict[str, Any]],
+    tags=["validation"],
+)
+async def validation_runs(
+    limit: int = Query(default=100, ge=1, le=500),
+) -> list[dict[str, Any]]:
+    try:
+        return await _require_database().validation_runs(limit=limit)
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc
+
+
+@app.get(
+    "/api/validation/runs/{run_id}",
+    response_model=dict[str, Any],
+    tags=["validation"],
+)
+async def validation_run(run_id: str) -> dict[str, Any]:
+    try:
+        row = await _require_database().validation_run(run_id)
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc
+    if row is None:
+        raise HTTPException(status_code=404, detail="ValidationRun NO DISPONIBLE")
+    return row
+
+
+@app.get(
+    "/api/validation/runs/{run_id}/metrics",
+    response_model=list[dict[str, Any]],
+    tags=["validation"],
+)
+async def validation_metrics(run_id: str) -> list[dict[str, Any]]:
+    try:
+        return await _require_database().validation_metrics(run_id)
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc
+
+
+@app.get(
+    "/api/validation/runs/{run_id}/errors",
+    response_model=list[dict[str, Any]],
+    tags=["validation"],
+)
+async def validation_errors(run_id: str) -> list[dict[str, Any]]:
+    try:
+        return await _require_database().validation_errors(run_id)
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="NO DISPONIBLE") from exc

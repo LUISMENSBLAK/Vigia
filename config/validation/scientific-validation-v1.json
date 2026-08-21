@@ -1,0 +1,53 @@
+{
+  "version": "scientific-validation-v1",
+  "frozen_before_baseline_run": true,
+  "baseline": {
+    "name": "VIGÍA Detection Baseline v1",
+    "source_commit": "73d157d907a0f3a377f8866ff6bd4eff4400c78c",
+    "fusion_version": "fusion-baseline-v1",
+    "detection_rule_version": "detection-rules-v1",
+    "fusion_configuration_hash": "297ccbc534daff66a9c8d94b1f4252c272f7eac7999db08427827a3f83b72314",
+    "automatic_confirmed_fire": false
+  },
+  "primary_matcher": {
+    "matcher_version": "spatiotemporal-one-to-one-v1",
+    "maximum_distance_m": 10000,
+    "maximum_time_gap_seconds": 86400,
+    "require_temporal_overlap": false,
+    "perimeter_mode": "WHEN_COMPATIBLE"
+  },
+  "sensitivity_grid": [
+    { "maximum_distance_m": 5000, "maximum_time_gap_seconds": 86400 },
+    { "maximum_distance_m": 10000, "maximum_time_gap_seconds": 86400 },
+    { "maximum_distance_m": 15000, "maximum_time_gap_seconds": 86400 },
+    { "maximum_distance_m": 5000, "maximum_time_gap_seconds": 172800 },
+    { "maximum_distance_m": 10000, "maximum_time_gap_seconds": 172800 },
+    { "maximum_distance_m": 15000, "maximum_time_gap_seconds": 172800 }
+  ],
+  "state_thresholds": [
+    "VIGILANCIA",
+    "ANOMALIA",
+    "POSIBLE_IGNICION",
+    "PROBABLE_INCENDIO"
+  ],
+  "statistics": {
+    "confidence_level": 0.95,
+    "proportion_interval": "WILSON",
+    "minimum_stratum_n": 30,
+    "bootstrap": {
+      "method": "EVENT_GROUP_PERCENTILE",
+      "seed": 20260820,
+      "iterations": 2000
+    }
+  },
+  "split": {
+    "policy_version": "validation-temporal-group-split-v1",
+    "development_fraction": 0.6,
+    "validation_fraction": 0.2,
+    "test_fraction": 0.2,
+    "event_group_maximum_distance_m": 25000,
+    "event_group_maximum_time_gap_seconds": 259200,
+    "test_access_requires_audit": true
+  }
+}
+

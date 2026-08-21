@@ -6,9 +6,8 @@ PHASE4_MIGRATION = Path("database/migrations/20260820010000_phase4_geospatial.sq
 PHASE4B_MIGRATION = Path("database/migrations/20260820020000_phase4b_real_geospatial.sql")
 PHASE5_MIGRATION = Path("database/migrations/20260820030000_phase5_national_risk.sql")
 PHASE6_MIGRATION = Path("database/migrations/20260820040000_phase6_historical_replay.sql")
-PHASE6_HARDENING = Path(
-    "database/migrations/20260820040100_phase6_replay_immutability.sql"
-)
+PHASE6_HARDENING = Path("database/migrations/20260820040100_phase6_replay_immutability.sql")
+PHASE7_MIGRATION = Path("database/migrations/20260821000000_phase7_scientific_validation.sql")
 
 
 def migration_sql() -> str:
@@ -37,6 +36,10 @@ def phase6_sql() -> str:
 
 def phase6_hardening_sql() -> str:
     return PHASE6_HARDENING.read_text(encoding="utf-8").casefold()
+
+
+def phase7_sql() -> str:
+    return PHASE7_MIGRATION.read_text(encoding="utf-8").casefold()
 
 
 def test_migration_keeps_private_and_api_schemas() -> None:
@@ -262,3 +265,63 @@ def test_phase6_frozen_manifest_is_database_enforced() -> None:
     assert "replay_cases_immutable_when_frozen" in sql
     assert "to_jsonb(new) - 'updated_at'" in sql
     assert "update vigia.replay_cases set frozen = true" in sql
+
+
+def test_phase7_versions_dataset_split_engine_and_report() -> None:
+    sql = phase7_sql()
+    for table in (
+        "validation_dataset_versions",
+        "validation_split_manifests",
+        "validation_dataset_members",
+        "validation_engine_versions",
+        "validation_metric_results",
+        "validation_matches",
+        "validation_errors",
+        "validation_test_access_log",
+    ):
+        assert f"create table vigia.{table}" in sql
+    for field in (
+        "dataset_hash",
+        "split_hash",
+        "configuration_hash",
+        "matcher_configuration_hash",
+        "report_hash",
+        "run_key",
+    ):
+        assert field in sql
+
+
+def test_phase7_test_access_and_published_runs_are_immutable() -> None:
+    sql = phase7_sql()
+    assert "test_set_frozen: falta auditoría de acceso" in sql
+    assert "validation_test_run_requires_audit" in sql
+    assert "validation_test_access_immutable" in sql
+    assert "validation_runs_immutable_when_published" in sql
+    assert "candidate_frozen boolean not null check (candidate_frozen)" in sql
+    assert "live_state_mutated boolean not null default false check (not live_state_mutated)" in sql
+
+
+def test_phase7_private_tables_force_rls_and_keep_unavailable_metrics() -> None:
+    sql = phase7_sql()
+    for table in (
+        "validation_dataset_versions",
+        "validation_split_manifests",
+        "validation_dataset_members",
+        "validation_control_windows",
+        "validation_engine_versions",
+        "validation_metric_results",
+        "validation_matches",
+        "validation_errors",
+        "validation_test_access_log",
+    ):
+        assert f"alter table vigia.{table} enable row level security" in sql
+        assert f"alter table vigia.{table} force row level security" in sql
+    assert "'available', 'insufficient_sample', 'no_disponible'" in sql
+    assert "metric_value double precision," in sql
+    assert "from public, anon, authenticated" in sql
+
+
+def test_phase7_reports_and_error_taxonomy_are_idempotent() -> None:
+    sql = phase7_sql()
+    assert "validation_runs_run_key_unique" in sql
+    assert "validation_errors_idempotency_idx" in sql

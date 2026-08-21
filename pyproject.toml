@@ -52,6 +52,7 @@ packages = [
   "vigia_ai.historical",
   "vigia_ai.replay",
   "vigia_ai.risk",
+  "vigia_ai.validation",
   "vigia_geospatial",
   "workers.aemet",
   "workers.copernicus",

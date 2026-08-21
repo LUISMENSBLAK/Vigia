@@ -20,3 +20,11 @@ test("replay separates historical knowledge from later truth", async ({ page }) 
   await expect(page.getByRole("heading", { name: "LO QUE SABEMOS AHORA" })).toHaveCount(0);
   await expect(page.getByText(/Ningún color es el único indicador/)).toBeVisible();
 });
+
+test("validation exposes evidence and unavailable results honestly", async ({ page }) => {
+  await page.goto("/validacion");
+  await expect(page.getByText("VALIDACIÓN EXPERIMENTAL · NO ES UN CLAIM OPERACIONAL")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Si no podemos defender la métrica, no la mostramos." })).toBeVisible();
+  await expect(page.getByText("Los controles no se inventan")).toBeVisible();
+  await expect(page.getByText("99,9% de precisión")).toHaveCount(0);
+});

@@ -776,6 +776,156 @@ class VigiaDatabase:
             "No se pudieron consultar las observaciones Replay.",
         )
 
+    async def validation_datasets(self, *, limit: int = 100) -> list[dict[str, Any]]:
+        return await self._mapped_query(
+            text(
+                """
+                select dataset.id::text, dataset.version, dataset.dataset_hash,
+                  dataset.event_count, dataset.control_count, dataset.regions_covered,
+                  dataset.years_covered, dataset.coverage_limitations,
+                  dataset.selection_policy_version, dataset.frozen,
+                  dataset.created_at, dataset.published_at,
+                  split.id::text as split_id, split.version as split_version,
+                  split.split_hash, split.development_count, split.validation_count,
+                  split.test_count, split.test_frozen, split.leakage_checked
+                from vigia.validation_dataset_versions dataset
+                left join lateral (
+                  select candidate.* from vigia.validation_split_manifests candidate
+                  where candidate.dataset_version_id = dataset.id
+                  order by candidate.created_at desc limit 1
+                ) split on true
+                order by dataset.created_at desc
+                limit :limit
+                """
+            ),
+            {"limit": limit},
+            "No se pudieron consultar los datasets de validación.",
+        )
+
+    async def validation_dataset(self, dataset_id: str) -> dict[str, Any] | None:
+        statement = text(
+            """
+            select dataset.id::text, dataset.version, dataset.dataset_hash,
+              dataset.manifest, dataset.sources, dataset.filters,
+              dataset.selection_policy_version, dataset.event_count,
+              dataset.control_count, dataset.regions_covered, dataset.years_covered,
+              dataset.coverage_limitations, dataset.frozen,
+              dataset.created_at, dataset.published_at
+            from vigia.validation_dataset_versions dataset
+            where dataset.id::text = :dataset_id or dataset.version = :dataset_id
+              or dataset.dataset_hash = :dataset_id
+            """
+        )
+        try:
+            async with self._engine.connect() as connection:
+                row = (
+                    (await connection.execute(statement, {"dataset_id": dataset_id}))
+                    .mappings()
+                    .one_or_none()
+                )
+        except (SQLAlchemyError, OSError) as exc:
+            raise DatabaseUnavailableError(
+                "No se pudo consultar el dataset de validación."
+            ) from exc
+        return dict(row) if row is not None else None
+
+    async def validation_runs(self, *, limit: int = 100) -> list[dict[str, Any]]:
+        return await self._mapped_query(
+            text(
+                """
+                select run.id::text, run.run_key, run.started_at, run.completed_at,
+                  run.commit_sha, run.dataset_hash, run.split_role::text,
+                  run.matcher_version, run.matcher_configuration_hash,
+                  run.configuration_hash, run.sample_counts,
+                  run.eligibility_counts, run.excluded_counts, run.limitations,
+                  run.unavailable_metrics, run.report_hash, run.published,
+                  run.reproducible, run.live_state_mutated,
+                  dataset.version as dataset_version,
+                  split.version as split_version,
+                  engine.name as engine_version
+                from vigia.validation_runs run
+                join vigia.validation_dataset_versions dataset
+                  on dataset.id = run.dataset_version_id
+                join vigia.validation_split_manifests split
+                  on split.id = run.split_manifest_id
+                join vigia.validation_engine_versions engine
+                  on engine.id = run.engine_version_id
+                where run.run_key is not null
+                order by run.started_at desc
+                limit :limit
+                """
+            ),
+            {"limit": limit},
+            "No se pudieron consultar los ValidationRuns.",
+        )
+
+    async def validation_run(self, run_id: str) -> dict[str, Any] | None:
+        statement = text(
+            """
+            select run.id::text, run.run_key, run.report, run.report_hash,
+              run.started_at, run.completed_at, run.commit_sha,
+              run.split_role::text, run.reproducible, run.published,
+              run.live_state_mutated, dataset.version as dataset_version,
+              dataset.dataset_hash, split.version as split_version,
+              split.split_hash, engine.name as engine_version
+            from vigia.validation_runs run
+            join vigia.validation_dataset_versions dataset
+              on dataset.id = run.dataset_version_id
+            join vigia.validation_split_manifests split
+              on split.id = run.split_manifest_id
+            join vigia.validation_engine_versions engine
+              on engine.id = run.engine_version_id
+            where run.id::text = :run_id or run.run_key = :run_id
+              or run.report_hash = :run_id
+            """
+        )
+        try:
+            async with self._engine.connect() as connection:
+                row = (
+                    (await connection.execute(statement, {"run_id": run_id}))
+                    .mappings()
+                    .one_or_none()
+                )
+        except (SQLAlchemyError, OSError) as exc:
+            raise DatabaseUnavailableError("No se pudo consultar ValidationRun.") from exc
+        return dict(row) if row is not None else None
+
+    async def validation_metrics(self, run_id: str) -> list[dict[str, Any]]:
+        return await self._mapped_query(
+            text(
+                """
+                select metric.metric_name, metric.availability::text, metric.unit,
+                  metric.population, metric.sample_size as n, metric.numerator,
+                  metric.denominator, metric.metric_value as value,
+                  metric.confidence_interval, metric.subgroup, metric.reason,
+                  metric.limitations
+                from vigia.validation_metric_results metric
+                join vigia.validation_runs run on run.id = metric.validation_run_id
+                where run.id::text = :run_id or run.run_key = :run_id
+                order by metric.metric_name, metric.subgroup::text
+                """
+            ),
+            {"run_id": run_id},
+            "No se pudieron consultar las métricas de validación.",
+        )
+
+    async def validation_errors(self, run_id: str) -> list[dict[str, Any]]:
+        return await self._mapped_query(
+            text(
+                """
+                select error.id::text, error.member_key, error.replay_incident_key,
+                  error.reason_codes, error.evidence, error.manual_override,
+                  error.created_at
+                from vigia.validation_errors error
+                join vigia.validation_runs run on run.id = error.validation_run_id
+                where run.id::text = :run_id or run.run_key = :run_id
+                order by error.created_at, error.id
+                """
+            ),
+            {"run_id": run_id},
+            "No se pudieron consultar los errores de validación.",
+        )
+
     async def _mapped_query(
         self, statement: Any, parameters: dict[str, Any], safe_error: str
     ) -> list[dict[str, Any]]:
